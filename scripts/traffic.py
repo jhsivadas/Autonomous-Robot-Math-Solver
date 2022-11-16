@@ -16,6 +16,11 @@ class TrafficNode(object):
     def run(self):
         # Once every 10 seconds
         sleep_time = 5
+        target = 5
+        l1 = 6
+        l2 = 7
+        l3 = 9
+
         while (not rospy.is_shutdown()):
             trafficMsg = Traffic()
             # trafficMsg.direction = self.direction_counter % 3
@@ -35,10 +40,15 @@ class TrafficNode(object):
 
             # vertical move up, 4in
             # joint3 -> marker tip = 9in
+            # trafficMsg.direction0 = 0
+            # trafficMsg.direction1 = np.arcsin((np.sqrt(4**2+16**2)-16)/(6))
+            # trafficMsg.direction2 = np.arctan(4/16)
+            # trafficMsg.direction3 = -trafficMsg.direction1
+            delta2 = np.sqrt((l2 + l3)**2 - target**2)
             trafficMsg.direction0 = 0
-            trafficMsg.direction1 = np.arcsin((np.sqrt(4**2+16**2)-16)/(6))
-            trafficMsg.direction2 = np.arctan(4/16)
-            trafficMsg.direction3 = -trafficMsg.direction1
+            trafficMsg.direction1 = np.arcsin((l2 + l3 - delta2) / l1)
+            trafficMsg.direction2 = np.arcsin(target / (l2 + l3)) - trafficMsg.direction1
+            trafficMsg.direction3 = 0
 
             self.traffic_status_pub.publish(trafficMsg)
             rospy.sleep(5)
