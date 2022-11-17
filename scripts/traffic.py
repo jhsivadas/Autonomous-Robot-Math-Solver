@@ -39,7 +39,10 @@ class TrafficNode(object):
     def set_arm_position_vertical(self, target_x: float, target_y: float) -> Traffic:
         """
         Sets the arm position to (target_x, target_y) where `x` is the robot's distance from wall (along the angle of theta_0)
-        and `y` is the vertical height (where 0 is the base of the robot's arm)
+        and `y` is the vertical height (where 0 is the base of the robot's arm).
+
+        The `origin` of this system is (target_x = self.box + self.l2 + self.l3, target_y = self.arm_height). All values in the (x, y)
+        place should be displaced off of this origin.
         """
         arm1_length = self.l1
         arm2_length = self.l2 + self.l3  #  We treat the second two joints as a single arm (never change theta_3)
