@@ -41,6 +41,7 @@ class Robot(object):
         arm_joint_1_goal = data.direction1
         arm_joint_2_goal = data.direction2
         arm_joint_3_goal = data.direction3
+        print(f"0: {np.degrees(arm_joint_0_goal)}, 1: {np.degrees(arm_joint_1_goal)}, 2: {np.degrees(arm_joint_2_goal)}, 3: {np.degrees(arm_joint_3_goal)}")
 
         gripper_joint_close = [-0.01, -0.01]
         gripper_joint_open = [0, 0]
