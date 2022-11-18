@@ -62,7 +62,7 @@ class TrafficNode(object):
         arm_msg = Traffic()
         arm_msg.direction0 = 0.0
         arm_msg.direction1 = theta1
-        arm_msg.direction2 = theta2
+        arm_msg.direction2 = -theta2
         arm_msg.direction3 = 0.0
 
         return arm_msg
