@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import namedtuple
 from scipy.signal import correlate2d
-from sklearn.cluster import KMeans
 from typing import Any, List, Tuple
 
 
@@ -138,8 +137,14 @@ class DigitClassifier:
 
 def group_digits(bounding_boxes: List[BoundingBox]) -> Tuple[List[BoundingBox], List[BoundingBox]]:
     y_values = list(map(lambda b: b.y, bounding_boxes))
-    clf = KMeans(n_clusters=2)  # Assume there are only 2 numbers
-    clusters = clf.fit_predict(X=np.expand_dims(y_values, axis=-1), y=None)
+
+    # Find the largest gap in y values
+    sorted_y_values = list(sorted(y_values))
+    gaps = [sorted_y_values[i] - sorted_y_values[i - 1] for i in range(1, len(sorted_y_values))]
+    max_gap_idx = np.argmax(gaps)
+
+    split_point_y = (sorted_y_values[max_gap_idx] + sorted_y_values[max_gap_idx + 1]) / 2.0
+    clusters = [int(box.y >= split_point_y) for box in bounding_boxes]
 
     group_one: List[BoundingBox] = []
     group_two: List[BoundingBox] = []
@@ -226,7 +231,7 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
 
 
 if __name__ == '__main__':
-    path = '../images/problem1.jpg'
+    path = '../images/problem0.jpg'
     img = cv2.imread(path, cv2.IMREAD_COLOR)
     img = cv2.resize(img, (600, 600))
 
