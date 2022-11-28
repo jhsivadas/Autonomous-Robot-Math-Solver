@@ -8,6 +8,12 @@ from math_solver.msg import Traffic
 from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
 from constants import PEN_LENGTH, BOX_LENGTH
 from utils import inches_to_meters
+from collections import namedtuple
+
+Point = namedtuple('Point', ['x', 'y', 'z'])
+VERTICAL_ADJUSTMENT = 0
+HORIZ_ADJUSTMENT = 0.05
+
 
 
 class TrafficNode(object):
@@ -28,7 +34,16 @@ class TrafficNode(object):
 
         self.last_msg = None
 
+        self.current_pos = Point(self.box + self.l2 + self.l3, self.arm_height + VERTICAL_ADJUSTMENT, 0.0)
+
         rospy.sleep(1)
+
+    def change_dist(self, x = 0.0):
+        self.current_pos = Point(self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z)
+        last_msg = self.set_arm_position_vertical(self.current_pos.x, self.current_pos.y)
+        theta = math.atan2(self.current_pos.z, self.box + self.l2 + self.l3)
+        last_msg.direction0 = theta
+        return last_msg
 
 
     def get_reset_msg(self):
@@ -36,9 +51,12 @@ class TrafficNode(object):
         #return self.last_msg
 
         curr_dist_from_wall = self.box + self.l2 + self.l3
-        curr_height = self.arm_height
+        curr_height = self.arm_height + VERTICAL_ADJUSTMENT
+
+        self.current_pos = Point(curr_dist_from_wall, curr_height, 0.0)
 
         self.last_msg = self.set_arm_position_vertical(curr_dist_from_wall, curr_height)
+        print("Reset{}".format(self.current_pos))
 
         return self.last_msg
 
@@ -79,13 +97,25 @@ class TrafficNode(object):
         if right:
             target *= -1
 
-        curr_dist_from_wall = self.box + self.l2 + self.l3
-        new_dist_from_wall = np.sqrt(target**2 + curr_dist_from_wall**2) + .006
+        
+        
+
+        origin_dist_from_wall = self.box + self.l2 + self.l3
+
+        theta = math.atan2((target + self.current_pos.z), origin_dist_from_wall)
+        new_dist_from_wall = np.sqrt((target + self.current_pos.z)**2 + origin_dist_from_wall**2) 
+        
+
+        # new_dist_from_wall = np.sqrt(target**2 + origin_dist_from_wall**2) + .006
         
         arm_msg = self.set_arm_position_vertical(target_x=new_dist_from_wall,
-                                                 target_y=self.arm_height)
+                                                 target_y=self.current_pos.y)
 
-        arm_msg.direction0 = np.arctan2(target, curr_dist_from_wall)
+        arm_msg.direction0 = theta
+
+        new_pos = Point(new_dist_from_wall, self.current_pos.y, target + self.current_pos.z)
+        self.current_pos = new_pos
+        print("Current Position: {}, theta: {}".format(self.current_pos, theta))
 
         return arm_msg
 
@@ -106,11 +136,17 @@ class TrafficNode(object):
         if up:
             target *= -1
 
-        curr_dist_from_wall = self.box + self.l2 + self.l3
-        new_vertical_position = self.arm_height - target
+        curr_dist_from_wall = self.current_pos.x
+        new_vertical_position = self.current_pos.y - target
 
         arm_msg = self.set_arm_position_vertical(target_x=curr_dist_from_wall,
                                                  target_y=new_vertical_position)
+
+        theta = math.atan2(self.current_pos.z, self.box + self.l2 + self.l3)
+        arm_msg.direction0 = theta
+
+        new_pos = Point(self.current_pos.x, new_vertical_position, self.current_pos.z)
+        self.current_pos = new_pos
 
         return arm_msg
 
@@ -131,38 +167,35 @@ class TrafficNode(object):
         #return trafficMsg
 
 
+    
+
     def draw_four(self, sleep_time, target):
-        self.traffic_status_pub.publish(
-            self.get_reset_msg())
+        self.traffic_status_pub.publish(self.get_reset_msg())
         rospy.sleep(sleep_time)
 
         down_msg = self.get_vertical_msg(target, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(
-            self.get_reset_msg())
+        right_msg = self.get_horizontal_msg(target, right=True)
+        self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
         up_msg = self.get_vertical_msg(target, up=True)
         self.traffic_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(
-            self.get_reset_msg())
+        down_msg = self.get_vertical_msg(target * 2, up=False)
+        self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(left_msg)
+        self.traffic_status_pub.publish(self.change_dist(.01))
+        rospy.sleep(sleep_time)
+        self.traffic_status_pub.publish(self.get_reset_msg())
         rospy.sleep(sleep_time)
 
-        up_msg = self.get_vertical_msg(target, up=True)
-        self.traffic_status_pub.publish(up_msg)
-        rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(
-            self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
 
     def draw_seven(self, sleep_time, target):
@@ -186,10 +219,42 @@ class TrafficNode(object):
             self.get_reset_msg())
         rospy.sleep(sleep_time)
 
+    def draw_left(self, sleep_time, target):
+        self.traffic_status_pub.publish(
+            self.get_reset_msg())
+        rospy.sleep(sleep_time)
+
+        self.traffic_status_pub.publish(
+            self.get_horizontal_msg(target, right=False))
+        rospy.sleep(sleep_time)
+
+        self.traffic_status_pub.publish(
+            self.get_horizontal_msg(target, right=False))
+        rospy.sleep(sleep_time)
+
+    def draw_up(self, sleep_time, target):
+        self.traffic_status_pub.publish(
+            self.get_reset_msg())
+        rospy.sleep(sleep_time)
+
+        self.traffic_status_pub.publish(
+            self.get_horizontal_msg (target, right=False))
+        rospy.sleep(sleep_time)
+
+        self.traffic_status_pub.publish(
+            self.get_vertical_msg(target, up=True))
+        rospy.sleep(sleep_time)
+
+      
+
+        
+
+
+
 
     def run(self):
         sleep_time = 3
-        target = inches_to_meters(2)    # 3" converted to m
+        target = inches_to_meters(1)    # 3" converted to m
 
         while (not rospy.is_shutdown()):
             self.draw_four(sleep_time, target)

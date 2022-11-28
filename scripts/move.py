@@ -48,7 +48,8 @@ class Robot(object):
 
         # self.move_group_gripper.go(gripper_joint_close)
         # self.move_group_gripper.stop()
-
+        print("moving")
+        print(arm_joint_1_goal)
         # wait=True ensures that the movement is synchronous
         self.move_group_arm.go([arm_joint_0_goal, arm_joint_1_goal, arm_joint_2_goal, arm_joint_3_goal], wait=True)
         # Calling ``stop()`` ensures that there is no residual movement
