@@ -3,6 +3,8 @@
 import rospy
 import math
 import numpy as np
+import h5py
+import os.path
 
 from math_solver.msg import Traffic
 from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
@@ -10,8 +12,13 @@ from constants import PEN_LENGTH, BOX_LENGTH
 from utils import inches_to_meters
 from collections import namedtuple
 
+import rospy, cv2, cv_bridge, numpy
+from sensor_msgs.msg import Image
+
+from extract_digits import extract_digits, DigitClassifier
+
 Point = namedtuple('Point', ['x', 'y', 'z'])
-VERTICAL_ADJUSTMENT = 0
+VERTICAL_ADJUSTMENT = -inches_to_meters(4.5)
 HORIZ_ADJUSTMENT = 0.05
 
 
@@ -29,6 +36,19 @@ class TrafficNode(object):
         # Set up traffic status publisher
         self.traffic_status_pub = rospy.Publisher("/traffic_status", Traffic, queue_size=10)
 
+        # set up ROS / OpenCV bridge
+        self.bridge = cv_bridge.CvBridge()
+
+        # initalize the debugging window
+        cv2.namedWindow("window", 1)
+
+        # subscribe to the robot's RGB camera data stream
+        self.image_sub = rospy.Subscriber('camera/rgb/image_raw',
+                Image, self.image_callback)
+
+        folder = os.path.dirname(__file__)
+        self.digit_classifier = DigitClassifier(os.path.join(folder, 'mnist.h5'))
+        
         # Counter to loop publishing direction with
         self.direction_counter = 0
 
@@ -38,13 +58,24 @@ class TrafficNode(object):
 
         rospy.sleep(1)
 
+    def image_callback(self, msg):
+        # converts the incoming ROS message to OpenCV format and HSV (hue, saturation, value)
+        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+
+        top_number_digits, bottom_number_digits = extract_digits(image, self.digit_classifier)
+
+        for digit in top_number_digits:
+            cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (255, 0, 0))
+
+        cv2.imshow("window", image)
+        cv2.waitKey(3)
+
     def change_dist(self, x = 0.0):
         self.current_pos = Point(self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z)
         last_msg = self.set_arm_position_vertical(self.current_pos.x, self.current_pos.y)
         theta = math.atan2(self.current_pos.z, self.box + self.l2 + self.l3)
         last_msg.direction0 = theta
         return last_msg
-
 
     def get_reset_msg(self):
         #self.last_msg = Traffic(0, 0, 0, 0)
@@ -255,6 +286,9 @@ class TrafficNode(object):
     def run(self):
         sleep_time = 3
         target = inches_to_meters(1)    # 3" converted to m
+
+        
+
 
         while (not rospy.is_shutdown()):
             self.draw_four(sleep_time, target)

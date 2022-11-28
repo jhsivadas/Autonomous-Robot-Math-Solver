@@ -62,6 +62,10 @@ class Robot(object):
         self.move_group_gripper.stop()
 
     def run(self):
+        # gripper_joint_close = [-0.01, -0.01]
+        # self.move_group_gripper.go(gripper_joint_close, wait=True)
+        # self.move_group_gripper.stop()
+        
         rospy.spin()
 
 if __name__ == "__main__":
