@@ -5,25 +5,34 @@ import math
 import numpy as np
 import h5py
 import os.path
+import cv2, cv_bridge
 
-from math_solver.msg import Traffic
-from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
-from constants import PEN_LENGTH, BOX_LENGTH
-from utils import inches_to_meters
 from collections import namedtuple
-
-import rospy, cv2, cv_bridge, numpy
+from enum import Enum, auto
+from math_solver.msg import Traffic
 from sensor_msgs.msg import Image
 
-from extract_digits import extract_digits, DigitClassifier
+from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
+from constants import PEN_LENGTH, BOX_LENGTH
+from utils import inches_to_meters, get_answer_locations, add_numbers
+from utils import image_point_to_draw_digit, DrawDigit, ImagePoint
+from extract_digits import extract_digits, DigitClassifier, Digit
+
 
 Point = namedtuple('Point', ['x', 'y', 'z'])
 VERTICAL_ADJUSTMENT = -inches_to_meters(4.5)
 HORIZ_ADJUSTMENT = 0.05
 
 
+class ControlMode(Enum):
+    EXTRACT_DIGITS = auto()
+    COMPUTE_SOLUTION = auto()
+    DRAW_ANSWER = auto()
+    COMPLETED = auto()
+
 
 class TrafficNode(object):
+
     def __init__(self):
         self.l1 = JOINT1_LENGTH   # base to joint2
         self.l2 = JOINT2_LENGTH   # joint2 to joint3
@@ -53,8 +62,10 @@ class TrafficNode(object):
         self.direction_counter = 0
 
         self.last_msg = None
-
         self.current_pos = Point(self.box + self.l2 + self.l3, self.arm_height + VERTICAL_ADJUSTMENT, 0.0)
+        self.control_mode = ControlMode.EXTRACT_DIGITS
+        self.draw_width = inches_to_meters(1)
+        self.draw_digits: List[DrawDigit] = []
 
         rospy.sleep(1)
 
@@ -67,10 +78,34 @@ class TrafficNode(object):
         for digit in top_number_digits:
             cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (255, 0, 0))
 
+        for digit in bottom_number_digits:
+            cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (0, 0, 255))
+
+        # Add the two values
+        add_digits, add_carry = add_numbers(top_number_digits, bottom_number_digits)
+
+        # Get the locations (in pixels) where we should start the result drawings
+        draw_locations = get_answer_locations(top_number_digits, bottom_number_digits, num_digits=len(add_digits), draw_width=self.draw_width)
+
+        self.digits_to_draw: List[DrawDigit] = []
+        for loc, digit in zip(draw_locations, add_digits):
+            draw_digit = image_point_to_draw_digit(image_point=loc,
+                                                   digit_value=digit,
+                                                   image_width=image.shape[1],
+                                                   vertical_starting_point=VERTICAL_ADJUSTMENT)
+            self.digits_to_draw.append(draw_digit)
+
+        for loc in draw_locations:
+            cv2.circle(image, (loc.horizontal_pixels, loc.vertical_pixels), 3, (0, 0, 255), 3)
+
+        print('Top Number: {}'.format(''.join(map(str, map(lambda d: d.value, top_number_digits)))))
+        print('Bottom Number: {}'.format(''.join(map(str, map(lambda d: d.value, bottom_number_digits)))))
+        print('Sum: {}'.format(''.join(map(str, reversed(add_digits)))))
+
         cv2.imshow("window", image)
         cv2.waitKey(3)
 
-    def change_dist(self, x = 0.0):
+    def change_dist(self, x: float):
         self.current_pos = Point(self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z)
         last_msg = self.set_arm_position_vertical(self.current_pos.x, self.current_pos.y)
         theta = math.atan2(self.current_pos.z, self.box + self.l2 + self.l3)
@@ -128,14 +163,10 @@ class TrafficNode(object):
         if right:
             target *= -1
 
-        
-        
-
         origin_dist_from_wall = self.box + self.l2 + self.l3
 
         theta = math.atan2((target + self.current_pos.z), origin_dist_from_wall)
         new_dist_from_wall = np.sqrt((target + self.current_pos.z)**2 + origin_dist_from_wall**2) 
-        
 
         # new_dist_from_wall = np.sqrt(target**2 + origin_dist_from_wall**2) + .006
         
@@ -146,7 +177,6 @@ class TrafficNode(object):
 
         new_pos = Point(new_dist_from_wall, self.current_pos.y, target + self.current_pos.z)
         self.current_pos = new_pos
-        print("Current Position: {}, theta: {}".format(self.current_pos, theta))
 
         return arm_msg
 
@@ -400,7 +430,6 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(self.get_reset_msg())
         rospy.sleep(sleep_time)
     
-    
     def draw_eight(self, sleep_time, target):
         self.traffic_status_pub.publish(self.get_reset_msg())
         rospy.sleep(sleep_time)
@@ -493,22 +522,13 @@ class TrafficNode(object):
     #         self.get_vertical_msg(target, up=True))
     #     rospy.sleep(sleep_time)
 
-      
-
-        
-
-
-
-
     def run(self):
         sleep_time = 3
         target = inches_to_meters(1)    # 3" converted to m
 
-        
-
-
         while (not rospy.is_shutdown()):
             self.draw_four(sleep_time, target)
+
 
 if __name__ == '__main__':
     rospy.init_node('traffic_controller')

@@ -168,7 +168,7 @@ def clip_to_bounding_box(image: np.ndarray, box: BoundingBox) -> np.ndarray:
 def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[BoundingBox]:
     # Convert image to HSV colors and extract the green lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    thresholded = cv2.inRange(hsv_img, (40, 15, 15), (100, 255, 255))
+    thresholded = cv2.inRange(hsv_img, (88, 110, 110), (110, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -179,27 +179,27 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
     if len(bounding_boxes) == 0:
         return []
 
-    merged_bounding_boxes: List[BoundingBox] = []
+    #merged_bounding_boxes: List[BoundingBox] = []
 
-    for box in bounding_boxes:
-        # Skip very small boxes
-        if (box.area < MIN_AREA):
-            continue
+    #for box in bounding_boxes:
+    #    # Skip very small boxes
+    #    if (box.area < MIN_AREA):
+    #        continue
 
-        if len(merged_bounding_boxes) == 0:
-            merged_bounding_boxes.append(box)
-        else:
-            distances = [box.distance_to(merged) for merged in merged_bounding_boxes]
-            min_dist_idx = np.argmin(distances)
+    #    if len(merged_bounding_boxes) == 0:
+    #        merged_bounding_boxes.append(box)
+    #    else:
+    #        distances = [box.distance_to(merged) for merged in merged_bounding_boxes]
+    #        min_dist_idx = np.argmin(distances)
 
-            if distances[min_dist_idx] < MERGE_DISTANCE:
-                merged_bounding_boxes[min_dist_idx].merge(box)
-            else:
-                merged_bounding_boxes.append(box)
+    #        if distances[min_dist_idx] < MERGE_DISTANCE:
+    #            merged_bounding_boxes[min_dist_idx].merge(box)
+    #        else:
+    #            merged_bounding_boxes.append(box)
 
     digit_bounding_boxes: List[BoundingBox] = []
 
-    for box in merged_bounding_boxes:
+    for box in bounding_boxes:
         if (box.area < MIN_AREA) or (box.height < MIN_HEIGHT) or ((box.width / box.height) >= MAX_RATIO):
             continue
 
