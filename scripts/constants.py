@@ -5,7 +5,7 @@ PEN_LENGTH = 0.095  # Center of gripper to end of pen tip
 BOX_LENGTH = 0.024  # Length of the offset box on second joint
 
 METERS_PER_PIXEL_HORIZONTAL = (0.255 / 320)  # Frame is 0.255m and 320 pixels wide
-METERS_PER_PIXEL_VERTICAL = (0.236 / 240)  # Frame is 0.236m and 240 pixels wide
+METERS_PER_PIXEL_VERTICAL = (0.195 / 240)  # Frame is 0.195m and 240 pixels wide
 
 BIG_NUMBER = 1e10
 SMALL_NUMBER = 1e-10

@@ -21,8 +21,11 @@ from extract_digits import extract_digits, DigitClassifier, Digit
 
 
 Point = namedtuple('Point', ['x', 'y', 'z'])
-VERTICAL_ADJUSTMENT = -inches_to_meters(1)
+VERTICAL_ADJUSTMENT = -inches_to_meters(3.5)
 HORIZ_ADJUSTMENT = 0.05
+PULLOFF_DIST = 0.05
+VERTICAL_NUM_MULTIPLIER = 1.75
+NUMBER_SIZE = 1
 
 
 class ControlMode(Enum):
@@ -67,6 +70,19 @@ class TrafficNode(object):
         self.draw_width = inches_to_meters(1)
         self.draw_digits: List[DrawDigit] = []
 
+        self.dispatch = {
+            0: self.draw_zero,
+            1: self.draw_one,
+            2: self.draw_two,
+            3: self.draw_three,
+            4: self.draw_four,
+            5: self.draw_five,
+            6: self.draw_six,
+            7: self.draw_seven,
+            8: self.draw_eight,
+            9: self.draw_nine
+        }
+
         rospy.sleep(1)
 
     def image_callback(self, msg):
@@ -107,8 +123,8 @@ class TrafficNode(object):
         print('Bottom Number: {}'.format(''.join(map(str, map(lambda d: d.value, bottom_number_digits)))))
         print('Sum: {}'.format(''.join(map(str, reversed(add_digits)))))
 
-        cv2.imshow("window", image)
-        cv2.waitKey(3)
+        # cv2.imshow("window", image)
+        # cv2.waitKey(3)
 
         self.control_mode = ControlMode.DRAW
 
@@ -233,11 +249,9 @@ class TrafficNode(object):
 
         #return trafficMsg
 
-    def draw_zero(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+    def draw_zero(self, sleep_time, target):
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -245,7 +259,7 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        up_msg = self.get_vertical_msg(target * 2, up=True)
+        up_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=True)
         self.traffic_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
@@ -253,28 +267,20 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
     def draw_one(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
     def draw_two(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
         right_msg = self.get_horizontal_msg(target, right=True)
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
@@ -284,7 +290,7 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
         down_msg = self.get_vertical_msg(target, up=False)
@@ -295,13 +301,21 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
     def draw_three(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        right_msg = self.get_horizontal_msg(target, right=True)
+        self.traffic_status_pub.publish(right_msg)
+        rospy.sleep(sleep_time)
+
+        down_msg = self.get_vertical_msg(target, up=False)
+        self.traffic_status_pub.publish(down_msg)
+        rospy.sleep(sleep_time)
+
+        left_msg = self.get_horizontal_msg(target, right=False)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -313,31 +327,14 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
-        right_msg = self.get_horizontal_msg(target, right=True)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target, up=False)
-        self.traffic_status_pub.publish(down_msg)
-        rospy.sleep(sleep_time)
-
-        left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
-        rospy.sleep(sleep_time)
-
-        self.traffic_status_pub.publish(self.change_dist(.01))
-        rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-        
 
     def draw_four(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
         down_msg = self.get_vertical_msg(target, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
@@ -350,26 +347,21 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
-        rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
 
     def draw_five(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
         right_msg = self.get_horizontal_msg(target, right=True)
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
         down_msg = self.get_vertical_msg(target, up=False)
@@ -385,19 +377,23 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
-        rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
     
+
     def draw_six(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        right_msg = self.get_horizontal_msg(target, right=True)
+        self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+        left_msg = self.get_horizontal_msg(target, right=False)
+        self.traffic_status_pub.publish(left_msg)
+        rospy.sleep(sleep_time)
+        
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -410,37 +406,28 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
-        rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
 
     def draw_seven(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
         right_msg = self.get_horizontal_msg(target, right=True)
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
-        rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
     
-    def draw_eight(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+    def draw_eight(self, sleep_time, target):
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -453,7 +440,7 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
         up_msg = self.get_vertical_msg(target, up=True)
@@ -468,20 +455,16 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
     def draw_nine(self, sleep_time, target):
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
-
         right_msg = self.get_horizontal_msg(target, right=True)
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 2, up=False)
+        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -490,17 +473,16 @@ class TrafficNode(object):
         rospy.sleep(sleep_time)
 
         left_msg = self.get_horizontal_msg(target, right=False)
-        self.traffic_status_pub.publish(right_msg)
+        self.traffic_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
         up_msg = self.get_vertical_msg(target, up=True)
         self.traffic_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        self.traffic_status_pub.publish(self.change_dist(.01))
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-        self.traffic_status_pub.publish(self.get_reset_msg())
-        rospy.sleep(sleep_time)
+
 
     def get_horizontal_parameters(self, horizontal_dist: float) -> Tuple[float, float]:
         # Move the arm to the start location
@@ -510,35 +492,54 @@ class TrafficNode(object):
         return theta0, dist_to_wall
 
 
-    def draw_answer_digit(self, digit: DrawDigit):
-        sleep_time = 3
+    def draw_answer_digit(self, digit: DrawDigit, sleep_time: int):
+        print("Drawing answer digit");
 
         # Reset the arm position
         reset_msg = self.get_reset_msg()
         self.traffic_status_pub.publish(reset_msg)
-        rospy.sleep(3)
+        rospy.sleep(sleep_time)
 
         # Pull arm off the wall
-        self.traffic_status_pub.publish(self.change_dist(0.01))
-        rospy.sleep(3)
+        self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
+        rospy.sleep(sleep_time)
 
         # Move the arm to the start location
         theta0, dist_to_wall = self.get_horizontal_parameters(digit.horizontal)
 
-        start_msg = self.set_arm_position_vertical(target_x=dist_to_wall,
-                                                   target_y=digit.vertical)
+        start_msg = self.set_arm_position_vertical(target_x=dist_to_wall - PULLOFF_DIST,
+                                                   target_y=self.arm_height + digit.vertical)
         start_msg.direction0 = theta0
 
         self.traffic_status_pub.publish(start_msg)
-        rospy.sleep(3)
+        rospy.sleep(sleep_time)
+
+        start_msg = self.set_arm_position_vertical(target_x=dist_to_wall,
+                                                   target_y=self.arm_height + digit.vertical)
+
+        start_msg.direction0 = theta0
+
+        self.traffic_status_pub.publish(start_msg)
+        rospy.sleep(sleep_time)
+
+        new_pos = Point(dist_to_wall, self.arm_height + digit.vertical, digit.horizontal)
+        self.current_pos = new_pos
+
+        # Gets the appropriate digit-drawing function and calls it
+        self.dispatch[digit.digit](sleep_time, inches_to_meters(NUMBER_SIZE))
+        rospy.sleep(sleep_time)
 
     def run(self):
         sleep_time = 3
 
         while (not rospy.is_shutdown()):
             if self.control_mode == ControlMode.DRAW:
-                digit = self.digits_to_draw[0]
-                self.draw_answer_digit(digit)
+                # digit = self.digits_to_draw[0]
+                for digit in self.digits_to_draw:
+                    self.draw_answer_digit(digit, sleep_time)
+                self.traffic_status_pub.publish(self.get_reset_msg())
+                self.control_mode = ControlMode.COMPLETED
+                rospy.signal_shutdown("Completed")
 
 
 if __name__ == '__main__':

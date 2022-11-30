@@ -25,8 +25,11 @@ def image_point_to_draw_digit(image_point: ImagePoint, digit_value: int, image_w
     Returns:
         A tuple containing the digit value, as well as the horizontal and vertical locations IN METERS of the digit to draw.
     """
-    horizontal = (image_point.horizontal_pixels - int(image_width / 2)) * METERS_PER_PIXEL_HORIZONTAL
-    vertical = -1 * image_point.vertical_pixels * METERS_PER_PIXEL_VERTICAL + vertical_starting_point
+    horizontal = (image_point.horizontal_pixels - int(image_width / 2)) * -METERS_PER_PIXEL_HORIZONTAL
+    vertical = -1 * image_point.vertical_pixels * METERS_PER_PIXEL_VERTICAL
+
+    print("Vertial Dist: {} -> {}, {}, Horizontal Dist: {} -> {}".format(image_point.vertical_pixels, vertical, vertical + vertical_starting_point, image_point.horizontal_pixels, horizontal))
+    vertical += vertical_starting_point
 
     return DrawDigit(horizontal=horizontal,
                      vertical=vertical,
