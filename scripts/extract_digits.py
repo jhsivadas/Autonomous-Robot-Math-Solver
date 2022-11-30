@@ -7,7 +7,7 @@ from scipy.signal import correlate2d
 from typing import Any, List, Tuple
 
 
-MIN_HEIGHT = 35
+MIN_HEIGHT = 10
 MIN_AREA = 25
 MERGE_DISTANCE = 10
 MAX_RATIO = 2.0
@@ -168,34 +168,18 @@ def clip_to_bounding_box(image: np.ndarray, box: BoundingBox) -> np.ndarray:
 def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[BoundingBox]:
     # Convert image to HSV colors and extract the green lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    thresholded = cv2.inRange(hsv_img, (88, 110, 110), (110, 255, 255))
+    thresholded = cv2.inRange(hsv_img, (88, 95, 95), (110, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    cv2.drawContours(image, contours, -1, (255, 0, 0), 3)
 
     bounding_rectangles = list(map(cv2.boundingRect, contours))
     bounding_boxes = [BoundingBox(x=x, y=y, width=w, height=h) for (x, y, w, h) in bounding_rectangles]
 
     if len(bounding_boxes) == 0:
-        return []
-
-    #merged_bounding_boxes: List[BoundingBox] = []
-
-    #for box in bounding_boxes:
-    #    # Skip very small boxes
-    #    if (box.area < MIN_AREA):
-    #        continue
-
-    #    if len(merged_bounding_boxes) == 0:
-    #        merged_bounding_boxes.append(box)
-    #    else:
-    #        distances = [box.distance_to(merged) for merged in merged_bounding_boxes]
-    #        min_dist_idx = np.argmin(distances)
-
-    #        if distances[min_dist_idx] < MERGE_DISTANCE:
-    #            merged_bounding_boxes[min_dist_idx].merge(box)
-    #        else:
-    #            merged_bounding_boxes.append(box)
+        return [], []
 
     digit_bounding_boxes: List[BoundingBox] = []
 
@@ -204,6 +188,9 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
             continue
 
         digit_bounding_boxes.append(box)
+
+    if len(digit_bounding_boxes) == 0:
+        return [], []
 
     # Group the digits in horizontal rows
     top_number, bottom_number = group_digits(digit_bounding_boxes)

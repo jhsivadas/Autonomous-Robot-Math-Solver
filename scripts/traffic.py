@@ -11,6 +11,7 @@ from collections import namedtuple
 from enum import Enum, auto
 from math_solver.msg import Traffic
 from sensor_msgs.msg import Image
+from typing import Tuple, List
 
 from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
 from constants import PEN_LENGTH, BOX_LENGTH
@@ -20,14 +21,13 @@ from extract_digits import extract_digits, DigitClassifier, Digit
 
 
 Point = namedtuple('Point', ['x', 'y', 'z'])
-VERTICAL_ADJUSTMENT = -inches_to_meters(4.5)
+VERTICAL_ADJUSTMENT = -inches_to_meters(1)
 HORIZ_ADJUSTMENT = 0.05
 
 
 class ControlMode(Enum):
     EXTRACT_DIGITS = auto()
-    COMPUTE_SOLUTION = auto()
-    DRAW_ANSWER = auto()
+    DRAW = auto()
     COMPLETED = auto()
 
 
@@ -70,6 +70,9 @@ class TrafficNode(object):
         rospy.sleep(1)
 
     def image_callback(self, msg):
+        if self.control_mode != ControlMode.EXTRACT_DIGITS:
+            return
+
         # converts the incoming ROS message to OpenCV format and HSV (hue, saturation, value)
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
 
@@ -89,6 +92,8 @@ class TrafficNode(object):
 
         self.digits_to_draw: List[DrawDigit] = []
         for loc, digit in zip(draw_locations, add_digits):
+            print('Digit: {}, Location: {}'.format(digit, loc))
+
             draw_digit = image_point_to_draw_digit(image_point=loc,
                                                    digit_value=digit,
                                                    image_width=image.shape[1],
@@ -104,6 +109,8 @@ class TrafficNode(object):
 
         cv2.imshow("window", image)
         cv2.waitKey(3)
+
+        self.control_mode = ControlMode.DRAW
 
     def change_dist(self, x: float):
         self.current_pos = Point(self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z)
@@ -191,7 +198,6 @@ class TrafficNode(object):
         #self.last_msg = trafficMsg
 
         #return trafficMsg
-
 
     def get_vertical_msg(self, target, up=False):
         if up:
@@ -496,38 +502,43 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(self.get_reset_msg())
         rospy.sleep(sleep_time)
 
-    # def draw_left(self, sleep_time, target):
-    #     self.traffic_status_pub.publish(
-    #         self.get_reset_msg())
-    #     rospy.sleep(sleep_time)
+    def get_horizontal_parameters(self, horizontal_dist: float) -> Tuple[float, float]:
+        # Move the arm to the start location
+        origin_dist_to_wall = self.box + self.l2 + self.l3
+        theta0 = np.arctan2(horizontal_dist, origin_dist_to_wall)
+        dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2)
+        return theta0, dist_to_wall
 
-    #     self.traffic_status_pub.publish(
-    #         self.get_horizontal_msg(target, right=False))
-    #     rospy.sleep(sleep_time)
 
-    #     self.traffic_status_pub.publish(
-    #         self.get_horizontal_msg(target, right=False))
-    #     rospy.sleep(sleep_time)
+    def draw_answer_digit(self, digit: DrawDigit):
+        sleep_time = 3
 
-    # def draw_up(self, sleep_time, target):
-    #     self.traffic_status_pub.publish(
-    #         self.get_reset_msg())
-    #     rospy.sleep(sleep_time)
+        # Reset the arm position
+        reset_msg = self.get_reset_msg()
+        self.traffic_status_pub.publish(reset_msg)
+        rospy.sleep(3)
 
-    #     self.traffic_status_pub.publish(
-    #         self.get_horizontal_msg (target, right=False))
-    #     rospy.sleep(sleep_time)
+        # Pull arm off the wall
+        self.traffic_status_pub.publish(self.change_dist(0.01))
+        rospy.sleep(3)
 
-    #     self.traffic_status_pub.publish(
-    #         self.get_vertical_msg(target, up=True))
-    #     rospy.sleep(sleep_time)
+        # Move the arm to the start location
+        theta0, dist_to_wall = self.get_horizontal_parameters(digit.horizontal)
+
+        start_msg = self.set_arm_position_vertical(target_x=dist_to_wall,
+                                                   target_y=digit.vertical)
+        start_msg.direction0 = theta0
+
+        self.traffic_status_pub.publish(start_msg)
+        rospy.sleep(3)
 
     def run(self):
         sleep_time = 3
-        target = inches_to_meters(1)    # 3" converted to m
 
         while (not rospy.is_shutdown()):
-            self.draw_four(sleep_time, target)
+            if self.control_mode == ControlMode.DRAW:
+                digit = self.digits_to_draw[0]
+                self.draw_answer_digit(digit)
 
 
 if __name__ == '__main__':
