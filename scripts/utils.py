@@ -26,7 +26,7 @@ def image_point_to_draw_digit(image_point: ImagePoint, digit_value: int, image_w
     Returns:
         A tuple containing the digit value, as well as the horizontal and vertical locations IN METERS of the digit to draw.
     """
-    horizontal = (image_point.horizontal_pixels - int(image_width / 2)) * -METERS_PER_PIXEL_HORIZONTAL
+    horizontal = (image_point.horizontal_pixels - int(image_width * (11 / 25.5))) * -METERS_PER_PIXEL_HORIZONTAL
     vertical = -1 * image_point.vertical_pixels * METERS_PER_PIXEL_VERTICAL
 
     print("Vertial Dist: {} -> {}, {}, Horizontal Dist: {} -> {}".format(image_point.vertical_pixels, vertical, vertical + vertical_starting_point, image_point.horizontal_pixels, horizontal))
@@ -80,9 +80,10 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
             draw_y = int(top_box.y + 3.5 * top_box.height)
             draw_x = int(top_box.x)
         else:
+            top_box = top_digits[top_idx].bounding_box
             bottom_box = bottom_digits[bottom_idx].bounding_box
             draw_y = int(bottom_box.y + 2.0 * bottom_box.height)
-            draw_x = int(bottom_box.x)
+            draw_x = int((top_box.x + bottom_box.x) / 2)
 
         y_values.append(draw_y)
         x_values.append(draw_x)
@@ -90,7 +91,7 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
     if (len(x_values) == 0) or len(y_values) == 0:
         return []
 
-    vertical_pos = np.median(y_values)
+    vertical_pos = int(np.median(y_values))
 
     for x_value in x_values:
         results.append(ImagePoint(horizontal_pixels=x_value, vertical_pixels=vertical_pos))
@@ -100,7 +101,7 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
 
     while len(results) < num_digits:
         prev_x = results[-1].horizontal_pixels
-        new_x = int(prev_x - (draw_width * 2.0) / METERS_PER_PIXEL_HORIZONTAL)
+        new_x = int(prev_x - (draw_width * 1.5) / METERS_PER_PIXEL_HORIZONTAL)
         results.append(ImagePoint(horizontal_pixels=new_x, vertical_pixels=vertical_pos))
 
     return results

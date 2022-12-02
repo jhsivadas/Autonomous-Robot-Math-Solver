@@ -24,9 +24,9 @@ from extract_digits import extract_digits, DigitClassifier, Digit
 Point = namedtuple('Point', ['x', 'y', 'z'])
 VERTICAL_ADJUSTMENT = -inches_to_meters(3.5)
 HORIZ_ADJUSTMENT = 0.05
-PULLOFF_DIST = 0.05
+PULLOFF_DIST = 0.07
 VERTICAL_NUM_MULTIPLIER = 1.75
-NUMBER_SIZE = 1
+NUMBER_SIZE = 0.75
 
 
 class ControlMode(Enum):
@@ -69,13 +69,13 @@ class TrafficNode(object):
         self.current_pos = Point(self.box + self.l2 + self.l3, self.arm_height + VERTICAL_ADJUSTMENT, 0.0)
         self.control_mode = ControlMode.EXTRACT_DIGITS
 
-        self.draw_width = inches_to_meters(1)
+        self.draw_width = inches_to_meters(NUMBER_SIZE)
         self.draw_digits: List[DrawDigit] = []
 
         self.num_digit_trials = 9
         self.digit_trial_counter = 0
         self.top_digit_trials: List[List[Digit]] = []
-        self.bottom_digit_trials = List[List[Digit]] = []
+        self.bottom_digit_trials: List[List[Digit]] = []
 
         self.dispatch = {
             0: self.draw_zero,
@@ -135,6 +135,7 @@ class TrafficNode(object):
             self.digits_to_draw.append(draw_digit)
 
         for loc in draw_locations:
+            print(loc)
             cv2.circle(image, (loc.horizontal_pixels, loc.vertical_pixels), 3, (0, 0, 255), 3)
 
         print('Top Number: {}'.format(''.join(map(str, map(lambda d: d.value, consolidated_top_digits)))))
@@ -157,7 +158,7 @@ class TrafficNode(object):
         #self.last_msg = Traffic(0, 0, 0, 0)
         #return self.last_msg
 
-        curr_dist_from_wall = self.box + self.l2 + self.l3
+        curr_dist_from_wall = self.box + self.l2 + self.l3 - PULLOFF_DIST
         curr_height = self.arm_height + VERTICAL_ADJUSTMENT
 
         self.current_pos = Point(curr_dist_from_wall, curr_height, 0.0)
@@ -467,18 +468,13 @@ class TrafficNode(object):
         # Move the arm to the start location
         origin_dist_to_wall = self.box + self.l2 + self.l3
         theta0 = np.arctan2(horizontal_dist, origin_dist_to_wall)
-        dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2)
+        print(f"Theta 0: {theta0}")
+        dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2) + (0.002 * abs(theta0))
         return theta0, dist_to_wall
 
 
     def draw_answer_digit(self, digit: DrawDigit, sleep_time: int):
         print("Drawing answer digit");
-
-        # Reset the arm position
-        reset_msg = self.get_reset_msg()
-        self.traffic_status_pub.publish(reset_msg)
-        rospy.sleep(sleep_time)
-
         # Pull arm off the wall
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
@@ -514,7 +510,11 @@ class TrafficNode(object):
 
         while (not rospy.is_shutdown()):
             if self.control_mode == ControlMode.DRAW:
-                # digit = self.digits_to_draw[0]
+                # Reset the arm position
+                reset_msg = self.get_reset_msg()
+                self.traffic_status_pub.publish(reset_msg)
+                rospy.sleep(sleep_time)
+
                 for digit in self.digits_to_draw:
                     self.draw_answer_digit(digit, sleep_time)
                 self.traffic_status_pub.publish(self.get_reset_msg())
