@@ -124,7 +124,7 @@ class TrafficNode(object):
         add_digits, add_carry = add_numbers(consolidated_top_digits, consolidated_bottom_digits)
 
         # Get the locations (in pixels) where we should start the result drawings
-        draw_locations = get_answer_locations(consolidated_top_digits, consolidated_bottom_digits, num_digits=len(add_digits), draw_width=self.draw_width)
+        draw_locations, carry_locations = get_answer_locations(consolidated_top_digits, consolidated_bottom_digits, num_digits=len(add_digits), draw_width=self.draw_width)
 
         self.digits_to_draw: List[DrawDigit] = []
         for loc, digit in zip(draw_locations, add_digits):
@@ -133,6 +133,18 @@ class TrafficNode(object):
                                                    image_width=image.shape[1],
                                                    vertical_starting_point=VERTICAL_ADJUSTMENT)
             self.digits_to_draw.append(draw_digit)
+
+        self.carry_digits_to_draw: List[DrawDigit] = []
+        if len(add_carry) == len(carry_locations) + 1:
+            add_carry = add_carry[:-1]
+        print(f"Carry locations: {carry_locations}")
+        print(f"Add Carry: {add_carry}")
+        for loc, digit in zip(carry_locations, add_carry):
+            draw_carry_digit = image_point_to_draw_digit(image_point=loc,
+                                                   digit_value=digit,
+                                                   image_width=image.shape[1],
+                                                   vertical_starting_point=VERTICAL_ADJUSTMENT)
+            self.carry_digits_to_draw.append(draw_carry_digit)
 
         for loc in draw_locations:
             print(loc)
@@ -473,7 +485,7 @@ class TrafficNode(object):
         return theta0, dist_to_wall
 
 
-    def draw_answer_digit(self, digit: DrawDigit, sleep_time: int):
+    def draw_answer_digit(self, digit: DrawDigit, sleep_time: int, is_carry: bool):
         print("Drawing answer digit");
         # Pull arm off the wall
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
@@ -500,8 +512,12 @@ class TrafficNode(object):
         new_pos = Point(dist_to_wall, self.arm_height + digit.vertical, digit.horizontal)
         self.current_pos = new_pos
 
+        if is_carry:
+            num_size = inches_to_meters(NUMBER_SIZE * 0.5)
+        else:
+            num_size = inches_to_meters(NUMBER_SIZE)
         # Gets the appropriate digit-drawing function and calls it
-        self.dispatch[digit.digit](sleep_time, inches_to_meters(NUMBER_SIZE))
+        self.dispatch[digit.digit](sleep_time, num_size)
         rospy.sleep(sleep_time)
 
     def run(self):
@@ -515,8 +531,11 @@ class TrafficNode(object):
                 self.traffic_status_pub.publish(reset_msg)
                 rospy.sleep(sleep_time)
 
-                for digit in self.digits_to_draw:
-                    self.draw_answer_digit(digit, sleep_time)
+                for i in range(len(self.digits_to_draw)):
+                    if i < len(self.carry_digits_to_draw) and self.carry_digits_to_draw[i].digit != 0:
+                        self.draw_answer_digit(self.carry_digits_to_draw[i], sleep_time, True)
+
+                    self.draw_answer_digit(self.digits_to_draw[i], sleep_time, False)
                 self.traffic_status_pub.publish(self.get_reset_msg())
                 self.control_mode = ControlMode.COMPLETED
                 rospy.signal_shutdown("Completed")

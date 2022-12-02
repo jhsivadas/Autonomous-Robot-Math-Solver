@@ -44,7 +44,7 @@ def add_numbers(top_digits: List[Digit], bottom_digits: List[Digit]) -> Tuple[Li
         bottom_values.append(0)
 
     result_digits: List[int] = []
-    carry_digits: List[int] = []
+    carry_digits: List[int] = [0]
 
     carry = 0
     for top, bottom in zip(top_values, bottom_values):
@@ -57,7 +57,6 @@ def add_numbers(top_digits: List[Digit], bottom_digits: List[Digit]) -> Tuple[Li
 
     if carry > 0:
         result_digits.append(carry)
-        carry_digits.append(0)
 
     return result_digits, carry_digits
 
@@ -96,6 +95,10 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
     for x_value in x_values:
         results.append(ImagePoint(horizontal_pixels=x_value, vertical_pixels=vertical_pos))
 
+    carry_locs = []
+    for digit in reversed(top_digits):
+        carry_locs.append(ImagePoint(horizontal_pixels=digit.bounding_box.x, vertical_pixels=digit.bounding_box.y - (1.5 * (draw_width / METERS_PER_PIXEL_VERTICAL))))
+
     if len(results) == 0:
         return results
 
@@ -104,7 +107,7 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
         new_x = int(prev_x - (draw_width * 1.5) / METERS_PER_PIXEL_HORIZONTAL)
         results.append(ImagePoint(horizontal_pixels=new_x, vertical_pixels=vertical_pos))
 
-    return results
+    return results, carry_locs
 
 
 def consolidate_digits(digit_lists: List[List[Digit]]) -> List[Digit]:
