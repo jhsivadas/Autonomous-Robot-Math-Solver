@@ -165,10 +165,10 @@ def clip_to_bounding_box(image: np.ndarray, box: BoundingBox) -> np.ndarray:
     return image[box.y:box.y + box.height, box.x:box.x + box.width]
 
 
-def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[BoundingBox]:
+def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[Digit]:
     # Convert image to HSV colors and extract the green lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    thresholded = cv2.inRange(hsv_img, (90, 70, 70), (120, 255, 255))
+    thresholded = cv2.inRange(hsv_img, (80, 75, 75), (120, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -182,24 +182,50 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
     digit_bounding_boxes: List[BoundingBox] = []
 
     for box in bounding_boxes:
-        if ((box.area < MIN_AREA) and ((box.height / box.width) <= MAX_RATIO)) or ((box.width / box.height) >= MAX_RATIO):
+        # Filter out boxes that are very wide but short. This generally is the line at the bottom
+        # of the arithmetic problem.
+        if (box.width / box.height) >= MAX_RATIO:
             continue
 
-        #cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
         digit_bounding_boxes.append(box)
 
+    # Merge adjacent boxes that are small
+    merged_bounding_boxes: List[BoundingBox] = []
+    for box in digit_bounding_boxes:
+        min_dists = [b.distance_to(box) for b in merged_bounding_boxes]
+
+        if (len(min_dists) == 0):
+            merged_bounding_boxes.append(box)
+        else:
+            min_idx = np.argmin(min_dists)
+            if (min_dists[min_idx] < MERGE_DISTANCE) and (box.area < MIN_AREA):
+                merged_bounding_boxes[min_idx].merge(box)
+            else:
+                merged_bounding_boxes.append(box)
+
     # Split boxes that have an overly large height. This often happens when the vertical contours get merged.
-    box_heights = list(map(lambda b: b.height, digit_bounding_boxes))
+    box_heights = list(map(lambda b: b.height, merged_bounding_boxes))
     height_threshold = np.median(box_heights) + 1.5 * (np.percentile(box_heights, 75) - np.percentile(box_heights, 25))
 
     split_bounding_boxes: List[BoundingBox] = []
-    for box in digit_bounding_boxes:
+    for box in merged_bounding_boxes:
+        # Filter out boxes that are too small, as these are likely not digits. The exception is `1`, which will
+        # be a small vertical line sometimes. We explicitly handle this edge case by looking at the ratio between height and width.
+        if (box.area < MIN_AREA) and ((box.height / box.width) <= MAX_RATIO):
+            continue
+
         if box.height > height_threshold:
             new_height = int(box.height / 2)
             split_bounding_boxes.append(BoundingBox(x=box.x, y=box.y, width=box.width, height=new_height))
             split_bounding_boxes.append(BoundingBox(x=box.x, y=box.y + new_height, width=box.width, height=new_height))
         else:
             split_bounding_boxes.append(box)
+
+    for box in split_bounding_boxes:
+        cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
+
+    #cv2.imshow('image', image)
+    #cv2.waitKey(0)
 
     if len(split_bounding_boxes) == 0:
         return [], []
@@ -234,7 +260,7 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
 
 
 if __name__ == '__main__':
-    path = 'image2.jpg'
+    path = 'image3.jpg'
     img = cv2.imread(path, cv2.IMREAD_COLOR)
 
     cv2.imshow('Problem', img)

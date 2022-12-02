@@ -17,6 +17,7 @@ from constants import JOINT1_LENGTH, JOINT2_LENGTH, JOINT3_LENGTH
 from constants import PEN_LENGTH, BOX_LENGTH
 from utils import inches_to_meters, get_answer_locations, add_numbers
 from utils import image_point_to_draw_digit, DrawDigit, ImagePoint
+from utils import consolidate_digits
 from extract_digits import extract_digits, DigitClassifier, Digit
 
 
@@ -67,8 +68,14 @@ class TrafficNode(object):
         self.last_msg = None
         self.current_pos = Point(self.box + self.l2 + self.l3, self.arm_height + VERTICAL_ADJUSTMENT, 0.0)
         self.control_mode = ControlMode.EXTRACT_DIGITS
+
         self.draw_width = inches_to_meters(1)
         self.draw_digits: List[DrawDigit] = []
+
+        self.num_digit_trials = 9
+        self.digit_trial_counter = 0
+        self.top_digit_trials: List[List[Digit]] = []
+        self.bottom_digit_trials = List[List[Digit]] = []
 
         self.dispatch = {
             0: self.draw_zero,
@@ -94,22 +101,33 @@ class TrafficNode(object):
 
         top_number_digits, bottom_number_digits = extract_digits(image, self.digit_classifier)
 
-        for digit in top_number_digits:
-            cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (255, 0, 0))
+        self.top_digit_trials.append(top_number_digits)
+        self.bottom_digit_trials.append(bottom_number_digits)
 
-        for digit in bottom_number_digits:
-            cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (0, 0, 255))
+        self.digit_trial_counter += 1
+
+        # Stop if we hae not taken enough trials yet
+        if self.digit_trial_counter < self.num_digit_trials:
+            return
+
+        # Otherwise, process the digits using the majority counts over all of the trials
+        consolidated_top_digits: List[Digit] = consolidate_digits(self.top_digit_trials)  # Top number digits in order of most significant to least significant
+        consolidated_bottom_digits: List[Digit] = consolidate_digits(self.bottom_digit_trials)  # Bottom number digits in order of most significant to least significant
+
+        #for digit in top_number_digits:
+        #    cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (255, 0, 0))
+
+        #for digit in bottom_number_digits:
+        #    cv2.rectangle(image, (digit.bounding_box.x, digit.bounding_box.y), (digit.bounding_box.x + digit.bounding_box.width, digit.bounding_box.y + digit.bounding_box.height), (0, 0, 255))
 
         # Add the two values
-        add_digits, add_carry = add_numbers(top_number_digits, bottom_number_digits)
+        add_digits, add_carry = add_numbers(consolidated_top_digits, consolidated_bottom_digits)
 
         # Get the locations (in pixels) where we should start the result drawings
-        draw_locations = get_answer_locations(top_number_digits, bottom_number_digits, num_digits=len(add_digits), draw_width=self.draw_width)
+        draw_locations = get_answer_locations(consolidated_top_digits, consolidated_bottom_digits, num_digits=len(add_digits), draw_width=self.draw_width)
 
         self.digits_to_draw: List[DrawDigit] = []
         for loc, digit in zip(draw_locations, add_digits):
-            print('Digit: {}, Location: {}'.format(digit, loc))
-
             draw_digit = image_point_to_draw_digit(image_point=loc,
                                                    digit_value=digit,
                                                    image_width=image.shape[1],
@@ -119,8 +137,8 @@ class TrafficNode(object):
         for loc in draw_locations:
             cv2.circle(image, (loc.horizontal_pixels, loc.vertical_pixels), 3, (0, 0, 255), 3)
 
-        print('Top Number: {}'.format(''.join(map(str, map(lambda d: d.value, top_number_digits)))))
-        print('Bottom Number: {}'.format(''.join(map(str, map(lambda d: d.value, bottom_number_digits)))))
+        print('Top Number: {}'.format(''.join(map(str, map(lambda d: d.value, consolidated_top_digits)))))
+        print('Bottom Number: {}'.format(''.join(map(str, map(lambda d: d.value, consolidated_bottom_digits)))))
         print('Sum: {}'.format(''.join(map(str, reversed(add_digits)))))
 
         # cv2.imshow("window", image)
@@ -181,7 +199,6 @@ class TrafficNode(object):
 
         return arm_msg
 
-
     def get_horizontal_msg(self, target, right=False):
         if right:
             target *= -1
@@ -203,18 +220,6 @@ class TrafficNode(object):
 
         return arm_msg
 
-        #trafficMsg = Traffic()
-        #delta = np.sqrt((self.l2+self.l3)**2 + target**2) - (self.l2 + self.l3)
-
-        #trafficMsg.direction0 = np.arctan(target / (self.l2 + self.l3))
-        #trafficMsg.direction1 = np.arcsin(delta / self.l1)
-        #trafficMsg.direction2 = -trafficMsg.direction1
-        #trafficMsg.direction3 = self.last_msg.direction3
-
-        #self.last_msg = trafficMsg
-
-        #return trafficMsg
-
     def get_vertical_msg(self, target, up=False):
         if up:
             target *= -1
@@ -232,23 +237,6 @@ class TrafficNode(object):
         self.current_pos = new_pos
 
         return arm_msg
-
-        #trafficMsg = Traffic()
-
-        #delta2 = np.sqrt((self.l2+self.l3)**2 - target**2)
-        #delta1 = self.box + self.l2 + self.l3 - delta2
-        #alpha = np.arcsin(target / (self.l2 + self.l3))
-
-        #print(f"alpha: {np.degrees(alpha)}, D1: {np.degrees(delta1)}, D2: {np.degrees(delta2)}, Phi: {np.degrees(self.phi)}")
-        #trafficMsg.direction0 = self.last_msg.direction0
-        #trafficMsg.direction1 = (np.arcsin(delta1 / self.l1) - self.phi)
-        #trafficMsg.direction2 = alpha - self.phi - trafficMsg.direction1
-        #trafficMsg.direction3 = self.last_msg.direction3
-
-        #self.last_msg = trafficMsg
-
-        #return trafficMsg
-
 
     def draw_zero(self, sleep_time, target):
         down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
@@ -270,7 +258,6 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
-
     def draw_one(self, sleep_time, target):
         down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
         self.traffic_status_pub.publish(down_msg)
@@ -278,7 +265,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-
 
     def draw_two(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -303,7 +289,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-
 
     def draw_three(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -333,7 +318,6 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
-
     def draw_four(self, sleep_time, target):
         down_msg = self.get_vertical_msg(target, up=False)
         self.traffic_status_pub.publish(down_msg)
@@ -353,7 +337,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-
 
     def draw_five(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -382,7 +365,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-    
 
     def draw_six(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -411,7 +393,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-
 
     def draw_seven(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
@@ -458,7 +439,6 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
-
     def draw_nine(self, sleep_time, target):
         right_msg = self.get_horizontal_msg(target, right=True)
         self.traffic_status_pub.publish(right_msg)
@@ -482,7 +462,6 @@ class TrafficNode(object):
 
         self.traffic_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
-
 
     def get_horizontal_parameters(self, horizontal_dist: float) -> Tuple[float, float]:
         # Move the arm to the start location
@@ -531,6 +510,7 @@ class TrafficNode(object):
 
     def run(self):
         sleep_time = 3
+        self.digit_trial_counter = 0
 
         while (not rospy.is_shutdown()):
             if self.control_mode == ControlMode.DRAW:

@@ -1,4 +1,5 @@
-from collections import namedtuple
+import numpy as np
+from collections import namedtuple, Counter
 from typing import List, Tuple
 from extract_digits import Digit
 from constants import METERS_PER_PIXEL_HORIZONTAL, METERS_PER_PIXEL_VERTICAL
@@ -89,10 +90,10 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
     if (len(x_values) == 0) or len(y_values) == 0:
         return []
 
-    min_vertical = min(y_values)
+    vertical_pos = np.median(y_values)
 
     for x_value in x_values:
-        results.append(ImagePoint(horizontal_pixels=x_value, vertical_pixels=min_vertical))
+        results.append(ImagePoint(horizontal_pixels=x_value, vertical_pixels=vertical_pos))
 
     if len(results) == 0:
         return results
@@ -100,6 +101,46 @@ def get_answer_locations(top_digits: List[Digit], bottom_digits: List[Digit], nu
     while len(results) < num_digits:
         prev_x = results[-1].horizontal_pixels
         new_x = int(prev_x - (draw_width * 2.0) / METERS_PER_PIXEL_HORIZONTAL)
-        results.append(ImagePoint(horizontal_pixels=new_x, vertical_pixels=min_vertical))
+        results.append(ImagePoint(horizontal_pixels=new_x, vertical_pixels=vertical_pos))
 
     return results
+
+
+def consolidate_digits(digit_lists: List[List[Digit]]) -> List[Digit]:
+    digit_counts: Counter = Counter()
+    for digit_list in digit_lists:
+        digit_counts[len(digit_list)] += 1
+
+    num_digits = digit_counts.most_common(1)[0][0]
+    result: List[Digit] = []
+
+    for digit_idx in range(num_digits):
+        digit_instances: List[Digit] = []
+
+        for digit_list in digit_lists:
+            if digit_idx < len(digit_list):
+                digit_instances.append(digit_list[digit_idx])
+
+        merged = merge_digit_instances(digit_instances)
+        result.append(merged)
+
+    return result
+
+
+def merge_digit_instances(digit_instances: List[Digit]) -> Digit:
+    if len(digit_instances) <= 0:
+        return Digit(value=-1, image=None, bounding_box=None)
+
+    # Get the most frequent digit in this batch
+    digit_counter: Counter = Counter()
+    for digit in digit_instances:
+        digit_counter[digit.value] += 1
+
+    majority_digit = digit_counter.most_common(1)[0][0]
+
+    # Return the first instance of the majority digit
+    for digit in digit_instances:
+        if digit.value == majority_digit:
+            return digit
+
+    return digit_instances[0]
