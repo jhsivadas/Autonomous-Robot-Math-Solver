@@ -8,7 +8,7 @@ from typing import Any, List, Tuple
 
 
 MIN_HEIGHT = 10
-MIN_AREA = 25
+MIN_AREA = 200
 MERGE_DISTANCE = 10
 MAX_RATIO = 2.0
 Digit = namedtuple('Digit', ['value', 'image', 'bounding_box'])
@@ -168,12 +168,10 @@ def clip_to_bounding_box(image: np.ndarray, box: BoundingBox) -> np.ndarray:
 def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[BoundingBox]:
     # Convert image to HSV colors and extract the green lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    thresholded = cv2.inRange(hsv_img, (88, 95, 95), (110, 255, 255))
+    thresholded = cv2.inRange(hsv_img, (90, 70, 70), (120, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    cv2.drawContours(image, contours, -1, (255, 0, 0), 3)
 
     bounding_rectangles = list(map(cv2.boundingRect, contours))
     bounding_boxes = [BoundingBox(x=x, y=y, width=w, height=h) for (x, y, w, h) in bounding_rectangles]
@@ -184,16 +182,30 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
     digit_bounding_boxes: List[BoundingBox] = []
 
     for box in bounding_boxes:
-        if (box.area < MIN_AREA) or (box.height < MIN_HEIGHT) or ((box.width / box.height) >= MAX_RATIO):
+        if ((box.area < MIN_AREA) and ((box.height / box.width) <= MAX_RATIO)) or ((box.width / box.height) >= MAX_RATIO):
             continue
 
+        #cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
         digit_bounding_boxes.append(box)
 
-    if len(digit_bounding_boxes) == 0:
+    # Split boxes that have an overly large height. This often happens when the vertical contours get merged.
+    box_heights = list(map(lambda b: b.height, digit_bounding_boxes))
+    height_threshold = np.median(box_heights) + 1.5 * (np.percentile(box_heights, 75) - np.percentile(box_heights, 25))
+
+    split_bounding_boxes: List[BoundingBox] = []
+    for box in digit_bounding_boxes:
+        if box.height > height_threshold:
+            new_height = int(box.height / 2)
+            split_bounding_boxes.append(BoundingBox(x=box.x, y=box.y, width=box.width, height=new_height))
+            split_bounding_boxes.append(BoundingBox(x=box.x, y=box.y + new_height, width=box.width, height=new_height))
+        else:
+            split_bounding_boxes.append(box)
+
+    if len(split_bounding_boxes) == 0:
         return [], []
 
     # Group the digits in horizontal rows
-    top_number, bottom_number = group_digits(digit_bounding_boxes)
+    top_number, bottom_number = group_digits(split_bounding_boxes)
 
     # Sort the bounding boxes by 'x' to get the digits in order (most significant to least significant)
     top_number = list(sorted(top_number, key=lambda b: b.x))
@@ -202,14 +214,18 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
     top_number_digits: List[Digit] = []
     bottom_number_digits: List[Digit] = []
 
+    # Use grayscale thresholding to extract the digits. This gives a sharper image.
+    grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    _, gray_thresholded = cv2.threshold(grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
     for box in top_number:
-        digit_img = clip_to_bounding_box(thresholded, box=box)
+        digit_img = clip_to_bounding_box(gray_thresholded, box=box)
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         top_number_digits.append(digit)
 
     for box in bottom_number:
-        digit_img = clip_to_bounding_box(thresholded, box=box)
+        digit_img = clip_to_bounding_box(gray_thresholded, box=box)
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         bottom_number_digits.append(digit)
@@ -218,9 +234,8 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
 
 
 if __name__ == '__main__':
-    path = '../images/problem0.jpg'
+    path = 'image2.jpg'
     img = cv2.imread(path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (600, 600))
 
     cv2.imshow('Problem', img)
     cv2.waitKey(0)
