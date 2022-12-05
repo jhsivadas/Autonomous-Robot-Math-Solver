@@ -137,17 +137,26 @@ class TrafficNode(object):
         self.carry_digits_to_draw: List[DrawDigit] = []
         if len(add_carry) == len(carry_locations) + 1:
             add_carry = add_carry[:-1]
+        
         print(f"Carry locations: {carry_locations}")
         print(f"Add Carry: {add_carry}")
+        
         for loc, digit in zip(carry_locations, add_carry):
             draw_carry_digit = image_point_to_draw_digit(image_point=loc,
-                                                   digit_value=digit,
-                                                   image_width=image.shape[1],
-                                                   vertical_starting_point=VERTICAL_ADJUSTMENT)
+                                                         digit_value=digit,
+                                                         image_width=image.shape[1],
+                                                         vertical_starting_point=VERTICAL_ADJUSTMENT)
+
+            # When drawing a 1, start in the middle of the box (as opposed to the left) because there is
+            # no horizontal component
+            if digit == 1:
+                draw_carry_digit = DrawDigit(horizontal=draw_carry_digit.horizontal + float(self.draw_width / 2.0),
+                                             vertical=draw_carry_digit.vertical,
+                                             digit=draw_carry_digit.digit)
+
             self.carry_digits_to_draw.append(draw_carry_digit)
 
         for loc in draw_locations:
-            print(loc)
             cv2.circle(image, (loc.horizontal_pixels, loc.vertical_pixels), 3, (0, 0, 255), 3)
 
         print('Top Number: {}'.format(''.join(map(str, map(lambda d: d.value, consolidated_top_digits)))))
