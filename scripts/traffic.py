@@ -72,7 +72,7 @@ class TrafficNode(object):
         self.draw_width = inches_to_meters(NUMBER_SIZE)
         self.draw_digits: List[DrawDigit] = []
 
-        self.num_digit_trials = 9
+        self.num_digit_trials = 5
         self.digit_trial_counter = 0
         self.top_digit_trials: List[List[Digit]] = []
         self.bottom_digit_trials: List[List[Digit]] = []
@@ -132,6 +132,12 @@ class TrafficNode(object):
                                                    digit_value=digit,
                                                    image_width=image.shape[1],
                                                    vertical_starting_point=VERTICAL_ADJUSTMENT)
+
+            if digit == 1:
+                draw_digit = DrawDigit(horizontal=draw_digit.horizontal - float(self.draw_width / 2.0),
+                                             vertical=draw_digit.vertical,
+                                             digit=draw_digit.digit)
+
             self.digits_to_draw.append(draw_digit)
 
         self.carry_digits_to_draw: List[DrawDigit] = []
@@ -150,7 +156,7 @@ class TrafficNode(object):
             # When drawing a 1, start in the middle of the box (as opposed to the left) because there is
             # no horizontal component
             if digit == 1:
-                draw_carry_digit = DrawDigit(horizontal=draw_carry_digit.horizontal + float(self.draw_width / 2.0),
+                draw_carry_digit = DrawDigit(horizontal=draw_carry_digit.horizontal - float(self.draw_width / 3.0),
                                              vertical=draw_carry_digit.vertical,
                                              digit=draw_carry_digit.digit)
 
@@ -454,7 +460,7 @@ class TrafficNode(object):
         self.traffic_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target, up=False)
+        down_msg = self.get_vertical_msg(target * 1.2, up=False)
         self.traffic_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -490,7 +496,7 @@ class TrafficNode(object):
         origin_dist_to_wall = self.box + self.l2 + self.l3
         theta0 = np.arctan2(horizontal_dist, origin_dist_to_wall)
         print(f"Theta 0: {theta0}")
-        dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2) + (0.002 * abs(theta0))
+        dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2) + (0.003 * abs(theta0))
         return theta0, dist_to_wall
 
 
@@ -522,7 +528,7 @@ class TrafficNode(object):
         self.current_pos = new_pos
 
         if is_carry:
-            num_size = inches_to_meters(NUMBER_SIZE * 0.5)
+            num_size = inches_to_meters(NUMBER_SIZE * 0.75)
         else:
             num_size = inches_to_meters(NUMBER_SIZE)
         # Gets the appropriate digit-drawing function and calls it
