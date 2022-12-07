@@ -2,6 +2,7 @@ import cv2
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from collections import namedtuple
 from scipy.signal import correlate2d
 from typing import Any, List, Tuple
@@ -317,7 +318,7 @@ def extract_digits(
 
     # Split boxes that have an overly large height. This often happens when the vertical contours get merged.
     box_heights = list(map(lambda b: b.height, merged_bounding_boxes))
-    height_threshold = np.median(box_heights) + 1.5 * (
+    height_threshold = np.median(box_heights) + 2.0 * (
         np.percentile(box_heights, 75) - np.percentile(box_heights, 25)
     )
 
@@ -354,11 +355,17 @@ def extract_digits(
     top_number_digits: List[Digit] = []
     bottom_number_digits: List[Digit] = []
 
+    #for box in split_bounding_boxes:
+    #    cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
+
+    #cv2.imshow('image', image)
+    #cv2.waitKey(0)
+
     # Use grayscale thresholding to extract the digits. This gives a sharper image.
-    grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, gray_thresholded = cv2.threshold(
-        grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
+    #grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #_, gray_thresholded = cv2.threshold(
+    #    grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    #)
 
     for box in top_number:
         # Clip the image and convert to grayscale
@@ -384,15 +391,14 @@ def extract_digits(
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         bottom_number_digits.append(digit)
-    import os
 
-    cv2.imwrite(os.path.join(os.path.dirname(__file__), "image.png"), image)
+    #cv2.imwrite(os.path.join(os.path.dirname(__file__), "image.png"), image)
 
     return top_number_digits, bottom_number_digits
 
 
 if __name__ == "__main__":
-    path = "image3.jpg"
+    path = "../images/image.png"
     img = cv2.imread(path, cv2.IMREAD_COLOR)
 
     cv2.imshow("Problem", img)
