@@ -27,16 +27,17 @@ The inverse kinematics component controls the arm's movements when drawing. The 
 Mention: digits should be in blue, other parts in another color; digits should be spaced apart for proper segmentation--the problem is that the camera is low resolution; the exact distance between the robot and the board.
 
 ## Challenges
-We initially ran into a few challenges in the actual implementation. In relation to practical implementation of inverse kinematics algorithms, we learned the hard way that precision in measurements is extremely important. We initially hand-measured the lengths of the arms on the robot to use for our inverse kinematics algorithms. This le
-(1) Originally tried to extract digits using grayscale and assuming it was the only thing drawn on the board, but lighting/glare on board makes this difficult
-2. Camera was in a fixed location which limited frame of reference
-(2) Joint 2 is set slightly ahead of Joint 1. This throws distances and angles off in the inverse kinematics calculations.
+We initially ran into a few challenges in the actual implementation. In relation to practical implementation of inverse kinematics algorithms, we learned the hard way that precision in measurements is extremely important. We initially hand-measured the lengths of the arms on the robot to use for our inverse kinematics algorithms but this led to innacuracies which caused the robot to not move the arm in the precise direction that we wanted.One major issue was that Joint 2 was set slightly ahead of Joint 1 which caused major issues in the distance and angular calculations of our inverse kinematics.  It wasn't until we got the exact measurements of the arm from the manual that our actual math was working the way that it was meant to. We also initially tried to use grayscale for digit extraction, but lighting/glare made this difficult and we had to apply exact parameters for specific blue color hues. 
 
 ## Future Work
 As the robot currently operates, it can only solve summation questions on the whiteboard. In the future, we hope to add functionality for subtraction, mutiplication, and long-division. Most of the processes would be similar (identifying digits, calculating starting drawing location, and drawing numbers) with slight alterations to the control flow. The long-division would be the most difficult, as its process is completely diferent to addition, subtraction, etc... We would also have to put in more work to define a classifier that can identify the function (addition, subtraction, multiplication, etc...) and not just the individual numbers. We also would want to extend current functionality such as having a higher set camera or view of the board to have better board space usages and larger math problems, handling arbitrary colors and not just blue, and having the turtlebot drive to the board to start drawing. 
 
 ## Takeaways
-
-- d
-2. The importance of teamwork in developing ideas from the ground up
-3. Breaking down complex projects into parts and specialties.
+1. The importance of teamwork in developing ideas from the ground up.
+- The project we implemented had multiple moving parts ranging from digit recognition, to calculations, to actual arm programming. Some parts were independent and some parts directly relied on eachother to operate. 
+- In planning the development of the actual development, our teamwork caused the design and outline to go as smoothly as possible. We were able to discuss what part we needed and brainstorm together how to tackle challenges.
+- The final robot result was a product of us starting from the beginning with a clear vision of what we wanted due to the initial work the entire group put in together to provide that clarity.
+2. The difficulties of inverse kinematics in achieving complex functional movements with pinpoint accuracy.
+- Before this project, we didn't really understand the actual difficulty it requires to calculate the outputs in inverse kinematics. It seemed like pure math, and with a few degrees of change, it seemed relatively straightforward. 
+- Actually implementing the algorithms required us to undergoe trial and error multiple times to sensitize it to the actual real world environment. At even just 3 angles, there were so many moving parts we had to account for, and possible frictions in the environment that could impact results.
+- The difficulty it must take to implement inverse kinematics algorithms with even more joints, especially in situations like robot surgery programming that requires millimeters of precisions, seems much more daunting after this project.
