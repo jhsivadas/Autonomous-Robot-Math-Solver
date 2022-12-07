@@ -27,11 +27,16 @@ The inverse kinematics component controls the arm's movements when drawing. The 
 Mention: digits should be in blue, other parts in another color; digits should be spaced apart for proper segmentation--the problem is that the camera is low resolution; the exact distance between the robot and the board.
 
 ## Challenges
+We initially ran into a few challenges in the actual implementation. In relation to practical implementation of inverse kinematics algorithms, we learned the hard way that precision in measurements is extremely important. We initially hand-measured the lengths of the arms on the robot to use for our inverse kinematics algorithms. This le
 (1) Originally tried to extract digits using grayscale and assuming it was the only thing drawn on the board, but lighting/glare on board makes this difficult
+2. Camera was in a fixed location which limited frame of reference
 (2) Joint 2 is set slightly ahead of Joint 1. This throws distances and angles off in the inverse kinematics calculations.
 
 ## Future Work
-Add more problems types (needs higher set camera for more usuable space on board), handle arbitrary colors on board (better resolution camera), and have turtlebot drive up to the board to start drawing (accurate LiDAR).
+As the robot currently operates, it can only solve summation questions on the whiteboard. In the future, we hope to add functionality for subtraction, mutiplication, and long-division. Most of the processes would be similar (identifying digits, calculating starting drawing location, and drawing numbers) with slight alterations to the control flow. The long-division would be the most difficult, as its process is completely diferent to addition, subtraction, etc... We would also have to put in more work to define a classifier that can identify the function (addition, subtraction, multiplication, etc...) and not just the individual numbers. We also would want to extend current functionality such as having a higher set camera or view of the board to have better board space usages and larger math problems, handling arbitrary colors and not just blue, and having the turtlebot drive to the board to start drawing. 
 
 ## Takeaways
 
+- d
+2. The importance of teamwork in developing ideas from the ground up
+3. Breaking down complex projects into parts and specialties.
