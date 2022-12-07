@@ -275,7 +275,7 @@ def extract_digits(
     """
     # Convert image to HSV colors and extract the blue lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    thresholded = cv2.inRange(hsv_img, (80, 75, 75), (120, 255, 255))
+    thresholded = cv2.inRange(hsv_img, (80, 50, 50), (120, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(
@@ -375,6 +375,9 @@ def extract_digits(
         _, digit_img = cv2.threshold(
             digit_grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
+
+        #cv2.imshow('digit', digit_img)
+        #cv2.waitKey(0)
 
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
