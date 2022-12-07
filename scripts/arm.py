@@ -45,6 +45,7 @@ class ControlMode(Enum):
 
 
 class ArmNode(object):
+
     def __init__(self):
         rospy.init_node("arm_node")
 
@@ -79,16 +80,19 @@ class ArmNode(object):
         # Counter to loop publishing direction with
         self.direction_counter = 0
 
-        # Initializes current position of arm
+        # Initializes current position of arm to joint angles (0, 0, 0, 0)
         self.last_msg = None
         self.current_pos = Point(
             self.box + self.l2 + self.l3, self.arm_height + VERTICAL_ADJUSTMENT, 0.0
         )
         self.control_mode = ControlMode.EXTRACT_DIGITS
 
+        # Set the width of each digit to a fixed size
         self.draw_width = inches_to_meters(NUMBER_SIZE)
         self.draw_digits: List[DrawDigit] = []
 
+        # Specify the number of image recognition trials to avoid
+        # issues due to camera inconsistencies
         self.num_digit_trials = 5
         self.digit_trial_counter = 0
         self.top_digit_trials: List[List[Digit]] = []
@@ -114,9 +118,11 @@ class ArmNode(object):
         if self.control_mode != ControlMode.EXTRACT_DIGITS:
             return
 
-        # converts the incoming ROS message to OpenCV format and HSV (hue, saturation, value)
+        # Converts the incoming ROS message to OpenCV format and HSV (hue, saturation, value)
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
+        # Extracts the digits from the image, and decodes the digit values
+        # using the digit classifier
         top_number_digits, bottom_number_digits = extract_digits(
             image, self.digit_classifier
         )
@@ -126,7 +132,7 @@ class ArmNode(object):
 
         self.digit_trial_counter += 1
 
-        # Stop if we hae not taken enough trials yet
+        # Stop if we have not taken enough trials yet
         if self.digit_trial_counter < self.num_digit_trials:
             return
 
@@ -134,6 +140,7 @@ class ArmNode(object):
         consolidated_top_digits: List[Digit] = consolidate_digits(
             self.top_digit_trials
         )  # Top number digits in order of most significant to least significant
+        
         consolidated_bottom_digits: List[Digit] = consolidate_digits(
             self.bottom_digit_trials
         )  # Bottom number digits in order of most significant to least significant
@@ -162,7 +169,8 @@ class ArmNode(object):
             )
 
             # Adjusts location of the 1 digit so it draws more centrally instead
-            # of along the left edge of its bounding box
+            # of along the left edge of its bounding box. We use this adjustment
+            # because the digit `1` has no horizontal component
             if digit == 1:
                 draw_digit = DrawDigit(
                     horizontal=draw_digit.horizontal - float(self.draw_width / 2.0),
@@ -173,12 +181,13 @@ class ArmNode(object):
             self.digits_to_draw.append(draw_digit)
 
         self.carry_digits_to_draw: List[DrawDigit] = []
+
+        # If we have more carry digits than locations, do not use the final carry (most significant)
+        # because this carry becomes the final answer digit
         if len(add_carry) == len(carry_locations) + 1:
             add_carry = add_carry[:-1]
 
-        print(f"Carry locations: {carry_locations}")
-        print(f"Add Carry: {add_carry}")
-
+        # Iterates through each `carry` digit to place it at its location
         for loc, digit in zip(carry_locations, add_carry):
             draw_carry_digit = image_point_to_draw_digit(
                 image_point=loc,
@@ -187,7 +196,7 @@ class ArmNode(object):
                 vertical_starting_point=VERTICAL_ADJUSTMENT,
             )
 
-            # When drawing a 1, start in the middle of the box (as opposed to
+            # When drawing a 1, start within of the box (as opposed to
             # the left) because there is no horizontal component
             if digit == 1:
                 draw_carry_digit = DrawDigit(
@@ -199,11 +208,7 @@ class ArmNode(object):
 
             self.carry_digits_to_draw.append(draw_carry_digit)
 
-        for loc in draw_locations:
-            cv2.circle(
-                image, (loc.horizontal_pixels, loc.vertical_pixels), 3, (0, 0, 255), 3
-            )
-
+        # Print debugging information about the digit recognition
         print(
             "Top Number: {}".format(
                 "".join(map(str, map(lambda d: d.value, consolidated_top_digits)))
@@ -216,12 +221,15 @@ class ArmNode(object):
         )
         print("Sum: {}".format("".join(map(str, reversed(add_digits)))))
 
-        # cv2.imshow("window", image)
-        # cv2.waitKey(3)
-
+        # Change the control mode to start drawing
         self.control_mode = ControlMode.DRAW
 
     def change_dist(self, x: float):
+        """
+        Changes the arm distance to the wall. An argument of 0.0 will place the pen on the wall. Positive values
+        will pull the arm off the wall.
+        """
+        assert x >= 0.0, 'Must provide a positive displacement'
         self.current_pos = Point(
             self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z
         )
@@ -233,23 +241,25 @@ class ArmNode(object):
         return last_msg
 
     def get_reset_msg(self):
+        """
+        Resets the arm position to the origin while pulling the pen off the wall.
+        """
         curr_dist_from_wall = self.box + self.l2 + self.l3 - PULLOFF_DIST
         curr_height = self.arm_height + VERTICAL_ADJUSTMENT
 
         self.current_pos = Point(curr_dist_from_wall, curr_height, 0.0)
 
         self.last_msg = self.set_arm_position_vertical(curr_dist_from_wall, curr_height)
-        print("Reset{}".format(self.current_pos))
-
         return self.last_msg
 
     def set_arm_position_vertical(self, target_x: float, target_y: float) -> Arm:
         """
         Sets the arm position to (target_x, target_y) where `x` is the robot's distance from wall (along the angle of theta_0)
-        and `y` is the vertical height (where 0 is the base of the robot's arm).
+        and `y` is the vertical height (where 0 is the base of the robot's arm). This function implements the inverse kinematics
+        to accomplish this movement.
 
         The `origin` of this system is (target_x = self.box + self.l2 + self.l3, target_y = self.arm_height). All values in the (x, y)
-        place should be displaced off of this origin.
+        place are displaced off of this origin.
         """
         arm1_length = self.l1
         arm2_length = (
@@ -262,8 +272,6 @@ class ArmNode(object):
         )
         alpha = np.arccos(cos_alpha)
 
-        # TODO: Maybe break ties based on the better angle with the board (or
-        # use Joint 3 to remove need entirely)
         q2 = math.pi - alpha
         theta2 = (math.pi / 2.0) - alpha + self.phi
 
@@ -276,22 +284,30 @@ class ArmNode(object):
         arm_msg = Arm()
         arm_msg.direction0 = 0.0
         arm_msg.direction1 = theta1
-        arm_msg.direction2 = theta2 - math.radians(12)
+        arm_msg.direction2 = theta2 - math.radians(12)  # We notice that the arm sags down at an angle of 0.0. This adjustment removes this inconsistency.
         arm_msg.direction3 = 0.0
 
         return arm_msg
 
-    def get_horizontal_msg(self, target, right=False):
+    def get_horizontal_msg(self, target, right=False) -> Arm:
+        """
+        Creates a message to move the arm horizontally a `target` number of meters.
+        """
         if right:
             target *= -1
 
         origin_dist_from_wall = self.box + self.l2 + self.l3
 
+        # Get the joint angle for theta0 to control the horizontal movement
         theta = math.atan2((target + self.current_pos.z), origin_dist_from_wall)
+
+        # Get the new distance to the wall along the direction of theta0
         new_dist_from_wall = np.sqrt(
-            (target + self.current_pos.z) ** 2 + origin_dist_from_wall**2
+            (target + self.current_pos.z)**2 + origin_dist_from_wall**2
         )
 
+        # Move the in the vertical direction to keep it straight along the
+        # desired horizontal line
         arm_msg = self.set_arm_position_vertical(
             target_x=new_dist_from_wall, target_y=self.current_pos.y
         )
@@ -305,7 +321,10 @@ class ArmNode(object):
 
         return arm_msg
 
-    def get_vertical_msg(self, target, up=False):
+    def get_vertical_msg(self, target, up=False) -> Arm:
+        """
+        Creates a message to move the arm vertically a `target` number of meters.
+        """
         if up:
             target *= -1
 
@@ -318,6 +337,7 @@ class ArmNode(object):
             target_x=curr_dist_from_wall, target_y=new_vertical_position
         )
 
+        # Set the angle of theta0 to the same as that of the current position
         theta = math.atan2(self.current_pos.z, self.box + self.l2 + self.l3)
         arm_msg.direction0 = theta
 
@@ -551,22 +571,29 @@ class ArmNode(object):
         rospy.sleep(sleep_time)
 
     def get_horizontal_parameters(self, horizontal_dist: float) -> Tuple[float, float]:
-        # Move the arm to the start location
+        """
+        Utility function to get the parameters for joint 0 when moving horizontally.
+        """
+        # Get the angle for joint 0
         origin_dist_to_wall = self.box + self.l2 + self.l3
         theta0 = np.arctan2(horizontal_dist, origin_dist_to_wall)
-        print(f"Theta 0: {theta0}")
+        
+        # Computes the distance to the wall. We add a small factor to ensure
+        # the pen keeps pressure on the board for better drawing.
         dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2) + (
             0.003 * abs(theta0)
         )
         return theta0, dist_to_wall
 
     def draw_answer_digit(self, digit: DrawDigit, sleep_time: int, is_carry: bool):
-        print("Drawing answer digit")
+        """
+        Draws the given digit at the provided location (in the DrawDigit tuple)
+        """
         # Pull arm off the wall
         self.arm_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
-        # Move the arm to the start location
+        # Move the arm to the start location and pull the pen off the board
         theta0, dist_to_wall = self.get_horizontal_parameters(digit.horizontal)
 
         start_msg = self.set_arm_position_vertical(
@@ -578,6 +605,7 @@ class ArmNode(object):
         self.arm_status_pub.publish(start_msg)
         rospy.sleep(sleep_time)
 
+        # Put the pen on the board
         start_msg = self.set_arm_position_vertical(
             target_x=dist_to_wall, target_y=self.arm_height + digit.vertical
         )
@@ -587,16 +615,20 @@ class ArmNode(object):
         self.arm_status_pub.publish(start_msg)
         rospy.sleep(sleep_time)
 
+        # Update the current position of the arm. This property is used internally
+        # within each of the draw_* functions.
         new_pos = Point(
             dist_to_wall, self.arm_height + digit.vertical, digit.horizontal
         )
         self.current_pos = new_pos
 
+        # Set the size of the digit to draw based on whether we are drawing a `carry` or a regular digit
         if is_carry:
             num_size = inches_to_meters(NUMBER_SIZE * 0.75)
         else:
             num_size = inches_to_meters(NUMBER_SIZE)
-        # Gets the appropriate digit-drawing function and calls it
+
+        # Gets the appropriate digit-drawing function and calls it to actually draw the digit
         self.dispatch[digit.digit](sleep_time, num_size)
         rospy.sleep(sleep_time)
 
@@ -611,6 +643,8 @@ class ArmNode(object):
                 self.arm_status_pub.publish(reset_msg)
                 rospy.sleep(sleep_time)
 
+                # Draw each digit, handling the nonzero carries before
+                # the digits down below.
                 for i in range(len(self.digits_to_draw)):
                     if (
                         i < len(self.carry_digits_to_draw)
@@ -621,6 +655,8 @@ class ArmNode(object):
                         )
 
                     self.draw_answer_digit(self.digits_to_draw[i], sleep_time, False)
+
+                # Reset the arm position and set the status to completed
                 self.arm_status_pub.publish(self.get_reset_msg())
                 self.control_mode = ControlMode.COMPLETED
                 rospy.signal_shutdown("Completed")

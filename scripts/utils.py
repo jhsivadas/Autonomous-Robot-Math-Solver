@@ -34,20 +34,13 @@ def image_point_to_draw_digit(
         A tuple containing the digit value, as well as the horizontal and
         vertical locations IN METERS of the digit to draw.
     """
+    # Get the horizontal adjustment, offset by the middle of the visible frame
     horizontal = (
         image_point.horizontal_pixels - int(image_width * (11 / 25.5))
     ) * -METERS_PER_PIXEL_HORIZONTAL
-    vertical = -1 * image_point.vertical_pixels * METERS_PER_PIXEL_VERTICAL
 
-    print(
-        "Vertial Dist: {} -> {}, {}, Horizontal Dist: {} -> {}".format(
-            image_point.vertical_pixels,
-            vertical,
-            vertical + vertical_starting_point,
-            image_point.horizontal_pixels,
-            horizontal,
-        )
-    )
+    # Get the vertical position, offset by the vertical starting point
+    vertical = -1 * image_point.vertical_pixels * METERS_PER_PIXEL_VERTICAL
     vertical += vertical_starting_point
 
     return DrawDigit(horizontal=horizontal, vertical=vertical, digit=digit_value)
@@ -56,6 +49,9 @@ def image_point_to_draw_digit(
 def add_numbers(
     top_digits: List[Digit], bottom_digits: List[Digit]
 ) -> Tuple[List[int], List[int]]:
+    """
+    Adds two numbers digit by digit and returns the answer digits and carry digits
+    """
     top_values = list(reversed([d.value for d in top_digits]))
     bottom_values = list(reversed([d.value for d in bottom_digits]))
 
@@ -76,9 +72,11 @@ def add_numbers(
         result_digits.append(digit)
         carry_digits.append(carry)
 
+    # append any excess carries
     if carry > 0:
         result_digits.append(carry)
 
+    # return the results and carries in order of least to most signifcant
     return result_digits, carry_digits
 
 
@@ -87,7 +85,20 @@ def get_answer_locations(
     bottom_digits: List[Digit],
     num_digits: int,
     draw_width: float,
-) -> List[ImagePoint]:
+) -> Tuple[List[ImagePoint], List[ImagePoint]]:
+    """
+    Gets the locations in pixels of where to draw the answer and carry digits.
+
+    Args:
+        top_digits: A list of the top number digits
+        bottom_digits: A list of the bottom number digits
+        num_digits: The number of digits in the result
+        draw_width: The size in meters of how large to draw each digit
+    Returns:
+        A tuple of two lists:
+            (1) The locations of where to draw the answer digits (least to most significant)
+            (2) the locations of where to draw the result digits (least to most significant)
+    """
     assert len(top_digits) >= len(
         bottom_digits
     ), "Must have at least as many top digits as bottom digits"
@@ -117,7 +128,7 @@ def get_answer_locations(
         x_values.append(draw_x)
 
     if (len(x_values) == 0) or len(y_values) == 0:
-        return []
+        return [], []
 
     vertical_pos = int(np.median(y_values))
 
@@ -138,7 +149,7 @@ def get_answer_locations(
         )
 
     if len(results) == 0:
-        return results
+        return results, []
 
     # adds remaining digits to the left side of the answer 1.5*draw_width to
     # the left of the previously leftmost digit
@@ -153,6 +164,11 @@ def get_answer_locations(
 
 
 def consolidate_digits(digit_lists: List[List[Digit]]) -> List[Digit]:
+    """
+    Merges the digit trials by finding each majority digit and returning an instance of this digit. This funciton
+    handles this behavior for a multi-digit number.
+    """
+    # Find the majority digit count across all trials.
     digit_counts: Counter = Counter()
     for digit_list in digit_lists:
         digit_counts[len(digit_list)] += 1
@@ -176,6 +192,10 @@ def consolidate_digits(digit_lists: List[List[Digit]]) -> List[Digit]:
 
 
 def merge_digit_instances(digit_instances: List[Digit]) -> Digit:
+    """
+    Merges trials of a single digit by finding the majority digit and using an instance
+    of this digit capture.
+    """
     if len(digit_instances) <= 0:
         return Digit(value=-1, image=None, bounding_box=None)
 

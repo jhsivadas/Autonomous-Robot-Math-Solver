@@ -15,6 +15,9 @@ Digit = namedtuple('Digit', ['value', 'image', 'bounding_box'])
 
 
 class BoundingBox:
+    """
+    Object handling a bounding box in an image.
+    """
 
     def __init__(self, x: int, y: int, width: int, height: int):
         self.x = x
@@ -53,8 +56,13 @@ class BoundingBox:
 
 
 class DigitClassifier:
+    """
+    A digit classifier implemented using a convolutional neural network. This classifier
+    only handles the forward (inference) operation of the neural network.
+    """
 
     def __init__(self, weights_path: str):
+        # Unpack the trained model weights
         with h5py.File(weights_path, 'r') as fin:
             self.conv0_filter = fin['model_weights']['conv0']['conv0']['kernel:0'][:]
             self.conv0_bias = fin['model_weights']['conv0']['conv0']['bias:0'][:]
@@ -70,12 +78,15 @@ class DigitClassifier:
 
     def conv2d(self, inputs: np.ndarray, conv_filters: np.ndarray, conv_bias: np.ndarray, stride: int) -> np.ndarray:
         """
-        Performs a 2d convolution with multiple input and output channels.
+        Performs a single 2d convolution with multiple input and output channels.
 
         Args:
             inputs: A [S, S, K] array of input features
-            conv_filters: A [T, T, K, L] array of T x T convolution filters
-
+            conv_filters: A [T, T, K, L] array of T x T convolution filters with K input channels and L output channels
+            conv_bias: A [T', T', L] additive bias
+            stride: The stride length for this filter
+        Returns:
+            A [T', T', L] array containing the convolution result.
         """
         # Get the number of input channels (K) and output channels (L)
         _, _, num_input_channels, num_output_channels = conv_filters.shape
@@ -84,9 +95,8 @@ class DigitClassifier:
         
         for output_channel_idx in range(num_output_channels):
 
-            #input_channel_conv = np.zeros(shape=(len(stride_indices), len(stride_indices), num_input_channels))
+            # Execute each input channel using the given filters and stride lengths
             input_channel_conv_list: List[np.ndarray] = []
-
             for input_channel_idx in range(num_input_channels):
                 conv_multi_in = correlate2d(inputs[:, :, input_channel_idx], conv_filters[:, :, input_channel_idx, output_channel_idx], mode='valid')  # [S', S']
 
@@ -95,10 +105,12 @@ class DigitClassifier:
 
                 input_channel_conv_list.append(np.expand_dims(conv_multi_in, axis=-1))
 
+            # Sum the results over the input channels
             input_channel_conv = np.concatenate(input_channel_conv_list, axis=-1)  # [R, R, K]
             conv_sums = np.sum(input_channel_conv, axis=-1, keepdims=True)  # [R, R, 1]
             results.append(conv_sums)  # [R, R, 1]
 
+        # Concatenate the output channels
         conv_result = np.concatenate(results, axis=-1)  # [R, R, L]
 
         # Apply the bias and relu activation
@@ -106,6 +118,17 @@ class DigitClassifier:
         return np.maximum(linear_transformed, 0)
 
     def dense(self, inputs: np.ndarray, weight_matrix: np.ndarray, bias: np.ndarray, should_activate: bool) -> np.ndarray:
+        """
+        Executes a single dense neural network layer.
+
+        Args:
+            inputs: A [K] vector of input features
+            weight_matrix: A [K, M] matrix of trained weights
+            bias: A [M] matrix containing the trained bias
+            should_activate: Whether to apply a ReLU activation
+        Returns:
+            A vector of size [M] containing the transformed values
+        """
         linear_transformed = np.matmul(inputs, weight_matrix) + bias
         
         if should_activate:
@@ -114,6 +137,15 @@ class DigitClassifier:
         return linear_transformed
 
     def predict(self, image: np.ndarray) -> int:
+        """
+        Performs a digit classification operations on a 2d unnormalized image
+
+        Args:
+            image: A [H, W] image containing pixel values in [0, 255]
+        Returns:
+            The model's digit prediction (0-9)
+        """
+
         # First, re-size the image to 28 x 28. To aid in the digit classification,
         # we pad the edges to place the digit in the middle of the frame
         resized = np.zeros(shape=(28, 28), dtype=float)
@@ -136,6 +168,10 @@ class DigitClassifier:
 
 
 def group_digits(bounding_boxes: List[BoundingBox]) -> Tuple[List[BoundingBox], List[BoundingBox]]:
+    """
+    Groups digits into 2 horizontal rows as would be seen in an addition problem. This grouping works by
+    finding a vertical threshold to split the observed digit bounding boxes
+    """
     y_values = list(map(lambda b: b.y, bounding_boxes))
 
     # Find the largest gap in y values
@@ -143,6 +179,7 @@ def group_digits(bounding_boxes: List[BoundingBox]) -> Tuple[List[BoundingBox], 
     gaps = [sorted_y_values[i] - sorted_y_values[i - 1] for i in range(1, len(sorted_y_values))]
     max_gap_idx = np.argmax(gaps)
 
+    # Set the split point based on the largest gap and cluster the digits
     split_point_y = (sorted_y_values[max_gap_idx] + sorted_y_values[max_gap_idx + 1]) / 2.0
     clusters = [int(box.y >= split_point_y) for box in bounding_boxes]
 
@@ -155,6 +192,7 @@ def group_digits(bounding_boxes: List[BoundingBox]) -> Tuple[List[BoundingBox], 
         else:
             group_two.append(box)
 
+    # Always return the top row first
     if min(map(lambda b: b.y, group_one)) < min(map(lambda b: b.y, group_two)):
         return group_one, group_two
     else:
@@ -165,14 +203,19 @@ def clip_to_bounding_box(image: np.ndarray, box: BoundingBox) -> np.ndarray:
     return image[box.y:box.y + box.height, box.x:box.x + box.width]
 
 
-def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List[Digit]:
-    # Convert image to HSV colors and extract the green lines (which are the pen)
+def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> Tuple[List[Digit], List[Digit]]:
+    """
+    Extracts digits from the given image and classifies them using the given classifier. This function
+    returnts the top and bottom digits in order of most significant to least significant.
+    """
+    # Convert image to HSV colors and extract the blue lines (which are the pen)
     hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     thresholded = cv2.inRange(hsv_img, (80, 75, 75), (120, 255, 255))
 
     # Get the contours from the thresholded image
     contours, hierarchy = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    # Find the bounding boxes for each contour
     bounding_rectangles = list(map(cv2.boundingRect, contours))
     bounding_boxes = [BoundingBox(x=x, y=y, width=w, height=h) for (x, y, w, h) in bounding_rectangles]
 
@@ -189,7 +232,8 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
 
         digit_bounding_boxes.append(box)
 
-    # Merge adjacent boxes that are small
+    # Merge adjacent boxes that are small. This handles some inconsistencies in
+    # the color extraction (we are working with a low resolution camera)
     merged_bounding_boxes: List[BoundingBox] = []
     for box in digit_bounding_boxes:
         min_dists = [b.distance_to(box) for b in merged_bounding_boxes]
@@ -220,12 +264,6 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> List
             split_bounding_boxes.append(BoundingBox(x=box.x, y=box.y + new_height, width=box.width, height=new_height))
         else:
             split_bounding_boxes.append(box)
-
-    for box in split_bounding_boxes:
-        cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
-
-    #cv2.imshow('image', image)
-    #cv2.waitKey(0)
 
     if len(split_bounding_boxes) == 0:
         return [], []
