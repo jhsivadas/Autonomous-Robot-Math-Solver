@@ -249,7 +249,7 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> Tupl
 
     # Split boxes that have an overly large height. This often happens when the vertical contours get merged.
     box_heights = list(map(lambda b: b.height, merged_bounding_boxes))
-    height_threshold = np.median(box_heights) + 1.5 * (np.percentile(box_heights, 75) - np.percentile(box_heights, 25))
+    height_threshold = np.median(box_heights) + 2.0 * (np.percentile(box_heights, 75) - np.percentile(box_heights, 25))
 
     split_bounding_boxes: List[BoundingBox] = []
     for box in merged_bounding_boxes:
@@ -267,7 +267,7 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> Tupl
 
     if len(split_bounding_boxes) == 0:
         return [], []
-
+    
     # Group the digits in horizontal rows
     top_number, bottom_number = group_digits(split_bounding_boxes)
 
@@ -279,17 +279,33 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> Tupl
     bottom_number_digits: List[Digit] = []
 
     # Use grayscale thresholding to extract the digits. This gives a sharper image.
-    grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, gray_thresholded = cv2.threshold(grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
+    #grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #_, gray_thresholded = cv2.threshold(grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    #_, gray_thresholded = cv2.threshold(grayscale, 160, 255, cv2.THRESH_BINARY)
+
+    #for box in split_bounding_boxes:
+    #    cv2.rectangle(thresholded, (box.x, box.y), (box.x + box.width, box.y + box.height), (128, 0, 0))
+
+    #cv2.imshow('thresholded', gray_thresholded)
+    #cv2.waitKey(0)
+
     for box in top_number:
-        digit_img = clip_to_bounding_box(gray_thresholded, box=box)
+        # Clip the image and convert to grayscale
+        digit_img_color = clip_to_bounding_box(image, box=box)
+
+        digit_grayscale = 255 - cv2.cvtColor(digit_img_color, cv2.COLOR_BGR2GRAY)
+        _, digit_img = cv2.threshold(digit_grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         top_number_digits.append(digit)
 
     for box in bottom_number:
-        digit_img = clip_to_bounding_box(gray_thresholded, box=box)
+        digit_img_color = clip_to_bounding_box(image, box=box)
+
+        digit_grayscale = 255 - cv2.cvtColor(digit_img_color, cv2.COLOR_BGR2GRAY)
+        _, digit_img = cv2.threshold(digit_grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         bottom_number_digits.append(digit)
@@ -298,7 +314,7 @@ def extract_digits(image: np.ndarray, digit_classifier: DigitClassifier) -> Tupl
 
 
 if __name__ == '__main__':
-    path = 'image3.jpg'
+    path = '../images/image.png'
     img = cv2.imread(path, cv2.IMREAD_COLOR)
 
     cv2.imshow('Problem', img)
