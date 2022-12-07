@@ -1,0 +1,7 @@
+<launch>
+  <!-- Initialize arm movement publisher -->
+  <node name="arm_move_pub" pkg="math_solver" type="move.py" output="screen"/>
+
+  <!-- Initialize arm controller -->
+  <node name="arm_node" pkg="math_solver" type="arm.py" output="screen"/>
+</launch>

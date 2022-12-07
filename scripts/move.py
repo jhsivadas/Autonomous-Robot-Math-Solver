@@ -14,7 +14,7 @@ class Robot(object):
     def __init__(self):
 
         # initialize this node
-        rospy.init_node("turtlebot3_dance")
+        rospy.init_node("arm_move_pub")
 
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator arm
