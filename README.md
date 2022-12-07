@@ -25,7 +25,19 @@ The inverse kinematics component controls the arm's movements when drawing. The 
 ## ROS Node Diagram
 
 ## Execution
-Mention: digits should be in blue, other parts in another color; digits should be spaced apart for proper segmentation--the problem is that the camera is low resolution; the exact distance between the robot and the board.
+Note: The following is required for the program to run properly
+- All problems should be written in blue with other parts in another color.
+- Digits should be spaced apart for proper segmentation
+- The front of the robot should be facing directly to the board at a distance of 21cm.
+
+# Process
+1. Terminal 1: ```roscore```
+2. Terminal 2: ```ssh``` into robot and run ```bringup```
+3. Terminal 3: ```ssh``` into robot and run ```bringup_cam```
+4. Terminal 4: ```rosrun image_transport republish compressed in:=raspicam_node/image raw out:=camera/rgb/image_raw```
+5. Terminal 5: ```roslaunch turtlebot3_manipulation_bringup turtlebot3_manipulation_bringup.launch```
+6. Terminal 6: ```roslaunch turtlebot3_manipulation_moveit_config move_group.launch```
+7. Terminal 7: ```roslaunch math_solver start.launch```
 
 ## Challenges
 We initially ran into a few challenges in the actual implementation. In relation to practical implementation of inverse kinematics algorithms, we learned the hard way that precision in measurements is extremely important. We initially hand-measured the lengths of the arms on the robot to use for our inverse kinematics algorithms but this led to innacuracies which caused the robot to not move the arm in the precise direction that we wanted.One major issue was that Joint 2 was set slightly ahead of Joint 1 which caused major issues in the distance and angular calculations of our inverse kinematics.  It wasn't until we got the exact measurements of the arm from the manual that our actual math was working the way that it was meant to. We also initially tried to use grayscale for digit extraction, but lighting/glare made this difficult and we had to apply exact parameters for specific blue color hues. 
