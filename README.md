@@ -4,6 +4,13 @@ Robot autonomously analyzes a math problem on a whiteboard and physically writes
 ## Team Members
 
 ## Project Description
+The goal of this project is to present a robot with a math problem on a white-board (currently just addition of any integer size within camera frame) and have the robot emulate the actions that a human would. This involves the robot solving single-digit sums from right to left across the problem, including carrying the 1 and physically marking the carry when there is overflow in the summation. The robot writes the proper calculation of the math problem below the actual problem on the whiteboard.
+This project requires a few main parts: 
+1. The computer first utilized the camera on the front to read an image of the math problem on the white board. This was then passed through a computer vision program that masked the color of the written problem (blue in our case) and broke apart the digits. It then used a convolutional neural network to classify the individual numbers for the calculation. This portion would return the digit value and pixel location of each digit in a ordered list (left to right and top to bottom).
+2. The actual mathematics was the simple part: breaking apart the integers to sum one column at a time and passing that through a control flow in the program.
+3. The other portion of the program took in an input from the digit classifier as to where the robot should start drawing. An inverse kinematics algorithm was used to adjust the robot arm ending point's x, y, and z value to move to the starting drawing portion.
+4. The robot then had to implement another inverse kinematics algorithm to actually draw. The robot can currently draw horizontal and vertical straight lines. All digits drawn are combinations of the horizontal and vertical movements.
+
 
 ## System Architecture
 We implemented algorithms in two major robotics areas: computer vision and inverse kinematics. The computer vision portion analyzes images of an addition problem. The kinematics component directs the arm to draw the answer digits in their correct locations. We highlight these components below.
