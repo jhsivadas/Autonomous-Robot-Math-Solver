@@ -2,6 +2,10 @@
 Robot autonomously analyzes a math problem on a whiteboard and physically writes out the answer using long addition and long multiplication. Program utilizes computer vision to analyze whiteboard and implements an inverse kinematics algorithm to move the robot arm and draw numbers.
 
 ## Team Members
+Jay Sivadas
+Tejas Kannan
+Logan Sherwin
+Justin Jones
 
 ## Project Description
 The goal of this project is to present a robot with a math problem on a white-board (currently just addition of any integer size within camera frame) and have the robot emulate the actions that a human would. This involves the robot solving single-digit sums from right to left across the problem, including carrying the 1 and physically marking the carry when there is overflow in the summation. The robot writes the proper calculation of the math problem below the actual problem on the whiteboard.
