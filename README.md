@@ -8,9 +8,14 @@ Jay Sivadas, Tejas Kannan, Logan Sherwin, Justin Jones
 The goal of this project is to present a Turtlebot with addition problems on a whiteboard with an integer number of digits within the visible frame. The robot then emulates the actions that a human would to solve the problem. This process involves the robot solving single-digit sums from right to left across the problem, including carrying any `1`'s and physically marking the carry when there is overflow in the summation. The robot writes the proper calculation of the math problem below the actual problem on the whiteboard.
 This project requires a few main parts: 
 1. The robot utilizes its front-facing camera to read an image of the math problem on the whiteboard. This image gets passed through a custom computer vision algorithm that extracts the color of the written digits (blue in our case) and segments the digits. It then uses a convolutional neural network to classify the individual numbers for the calculation. From this image processing, the robot obtains the values and pixel locations of each digit in an ordered list (left to right and top to bottom).
+<img width="317" alt="image" src="https://user-images.githubusercontent.com/77175987/206541024-739463a5-ec46-4d7b-a749-9dacf3f5b3d9.png">
 2. The robot performs the addition operation by breaking apart the integers to sum one column at a time. From this step, we obtain the answer digits and any carry values.
 3. The Turtlebot then uses the digit pixel locations to determine where to draw the answer digits. We implement this component using an inverse kinematics algorithm which moves the robot's arm to the desired position on the whiteboard.
-4. The robot then uses another inverse kinematics algorithm to draw each digit. We implement the ability to draw horizontal and vertical straight lines, and we construct each digit using combinations of horizontal and vertical movements.
+<img width="306" alt="image" src="https://user-images.githubusercontent.com/77175987/206541144-f80a68ff-2472-49bb-ba26-b4f0a41a0b26.png">
+4. The Turtlebot then uses the digit pixel locations to determine where to draw the answer digits. We implement this component using an inverse kinematics algorithm which moves the robot's arm to the desired position on the whiteboard.
+5. The robot then uses another inverse kinematics algorithm to draw each digit. We implement the ability to draw horizontal and vertical straight lines, and we construct each digit using combinations of horizontal and vertical movements.
+<img width="363" alt="image" src="https://user-images.githubusercontent.com/77175987/206541321-eaf36add-1218-465c-b98e-2d47cd908720.png">
+
 
 ## System Architecture
 We implemented algorithms in two major robotics areas: computer vision and inverse kinematics. The computer vision portion analyzes images of an addition problem. The kinematics component directs the arm to draw the answer digits in their correct locations. We highlight these components below.
