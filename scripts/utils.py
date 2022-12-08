@@ -121,7 +121,7 @@ def get_answer_locations(
         else:
             top_box = top_digits[top_idx].bounding_box
             bottom_box = bottom_digits[bottom_idx].bounding_box
-            draw_y = int(bottom_box.y + 2.0 * bottom_box.height)
+            draw_y = int(bottom_box.y + 1.5 * bottom_box.height)
             draw_x = int((top_box.x + bottom_box.x) / 2)
 
         y_values.append(draw_y)

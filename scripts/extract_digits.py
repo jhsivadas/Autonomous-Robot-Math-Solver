@@ -355,18 +355,6 @@ def extract_digits(
     top_number_digits: List[Digit] = []
     bottom_number_digits: List[Digit] = []
 
-    #for box in split_bounding_boxes:
-    #    cv2.rectangle(image, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 0))
-
-    #cv2.imshow('image', image)
-    #cv2.waitKey(0)
-
-    # Use grayscale thresholding to extract the digits. This gives a sharper image.
-    #grayscale = 255 - cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    #_, gray_thresholded = cv2.threshold(
-    #    grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    #)
-
     for box in top_number:
         # Clip the image and convert to grayscale
         digit_img_color = clip_to_bounding_box(image, box=box)
@@ -375,9 +363,6 @@ def extract_digits(
         _, digit_img = cv2.threshold(
             digit_grayscale, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
-
-        #cv2.imshow('digit', digit_img)
-        #cv2.waitKey(0)
 
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
@@ -394,8 +379,6 @@ def extract_digits(
         digit_value = digit_classifier.predict(digit_img)
         digit = Digit(value=digit_value, image=digit_img, bounding_box=box)
         bottom_number_digits.append(digit)
-
-    #cv2.imwrite(os.path.join(os.path.dirname(__file__), "image.png"), image)
 
     return top_number_digits, bottom_number_digits
 

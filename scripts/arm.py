@@ -45,7 +45,6 @@ class ControlMode(Enum):
 
 
 class ArmNode(object):
-
     def __init__(self):
         rospy.init_node("arm_node")
 
@@ -66,7 +65,7 @@ class ArmNode(object):
         self.bridge = cv_bridge.CvBridge()
 
         # initalize the debugging window
-        cv2.namedWindow("window", 1)
+        # cv2.namedWindow("window", 1)
 
         # subscribe to the robot's RGB camera data stream
         self.image_sub = rospy.Subscriber(
@@ -140,7 +139,7 @@ class ArmNode(object):
         consolidated_top_digits: List[Digit] = consolidate_digits(
             self.top_digit_trials
         )  # Top number digits in order of most significant to least significant
-        
+
         consolidated_bottom_digits: List[Digit] = consolidate_digits(
             self.bottom_digit_trials
         )  # Bottom number digits in order of most significant to least significant
@@ -229,7 +228,7 @@ class ArmNode(object):
         Changes the arm distance to the wall. An argument of 0.0 will place the pen on the wall. Positive values
         will pull the arm off the wall.
         """
-        assert x >= 0.0, 'Must provide a positive displacement'
+        assert x >= 0.0, "Must provide a positive displacement"
         self.current_pos = Point(
             self.box + self.l2 + self.l3 - x, self.current_pos.y, self.current_pos.z
         )
@@ -283,8 +282,9 @@ class ArmNode(object):
 
         arm_msg = Arm()
         arm_msg.direction0 = 0.0
-        arm_msg.direction1 = theta1
-        arm_msg.direction2 = theta2 - math.radians(12)  # We notice that the arm sags down at an angle of 0.0. This adjustment removes this inconsistency.
+        arm_msg.direction1 = theta1 * 1.001
+        # We notice that the arm sags down at an angle of 0.0. This adjustment removes this inconsistency.
+        arm_msg.direction2 = theta2 - math.radians(12)
         arm_msg.direction3 = 0.0
 
         return arm_msg
@@ -303,7 +303,7 @@ class ArmNode(object):
 
         # Get the new distance to the wall along the direction of theta0
         new_dist_from_wall = np.sqrt(
-            (target + self.current_pos.z)**2 + origin_dist_from_wall**2
+            (target + self.current_pos.z) ** 2 + origin_dist_from_wall**2
         )
 
         # Move the in the vertical direction to keep it straight along the
@@ -347,7 +347,9 @@ class ArmNode(object):
         return arm_msg
 
     def draw_zero(self, sleep_time, target):
-        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
+        down_msg = self.get_vertical_msg(
+            target * VERTICAL_NUM_MULTIPLIER - 0.015, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -359,7 +361,7 @@ class ArmNode(object):
         self.arm_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        left_msg = self.get_horizontal_msg(target, right=False)
+        left_msg = self.get_horizontal_msg(target * 1.2, right=False)
         self.arm_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
@@ -375,11 +377,17 @@ class ArmNode(object):
         rospy.sleep(sleep_time)
 
     def draw_two(self, sleep_time, target):
+        up_msg = self.get_vertical_msg(0.01, up=True)
+        self.arm_status_pub.publish(up_msg)
+        rospy.sleep(sleep_time)
+
         right_msg = self.get_horizontal_msg(target, right=True)
         self.arm_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target, up=False)
+        down_msg = self.get_vertical_msg(
+            (target * VERTICAL_NUM_MULTIPLIER) / 2, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -387,7 +395,9 @@ class ArmNode(object):
         self.arm_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target, up=False)
+        down_msg = self.get_vertical_msg(
+            (target * VERTICAL_NUM_MULTIPLIER) / 2, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -475,15 +485,9 @@ class ArmNode(object):
         rospy.sleep(sleep_time)
 
     def draw_six(self, sleep_time, target):
-        right_msg = self.get_horizontal_msg(target, right=True)
-        self.arm_status_pub.publish(right_msg)
-        rospy.sleep(sleep_time)
-
-        left_msg = self.get_horizontal_msg(target, right=False)
-        self.arm_status_pub.publish(left_msg)
-        rospy.sleep(sleep_time)
-
-        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
+        down_msg = self.get_vertical_msg(
+            target * VERTICAL_NUM_MULTIPLIER - 0.01, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -499,10 +503,22 @@ class ArmNode(object):
         self.arm_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
+        up_msg = self.get_vertical_msg(target, up=True)
+        self.arm_status_pub.publish(up_msg)
+        rospy.sleep(sleep_time)
+
+        right_msg = self.get_horizontal_msg(target, right=True)
+        self.arm_status_pub.publish(right_msg)
+        rospy.sleep(sleep_time)
+
         self.arm_status_pub.publish(self.change_dist(PULLOFF_DIST))
         rospy.sleep(sleep_time)
 
     def draw_seven(self, sleep_time, target):
+        up_msg = self.get_vertical_msg(0.01, up=True)
+        self.arm_status_pub.publish(up_msg)
+        rospy.sleep(sleep_time)
+
         right_msg = self.get_horizontal_msg(target, right=True)
         self.arm_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
@@ -515,7 +531,9 @@ class ArmNode(object):
         rospy.sleep(sleep_time)
 
     def draw_eight(self, sleep_time, target):
-        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
+        down_msg = self.get_vertical_msg(
+            target * VERTICAL_NUM_MULTIPLIER - 0.01, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -523,23 +541,27 @@ class ArmNode(object):
         self.arm_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        up_msg = self.get_vertical_msg(target, up=True)
+        up_msg = self.get_vertical_msg(
+            (target * VERTICAL_NUM_MULTIPLIER) / 2 * 1.1, up=True
+        )
         self.arm_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        left_msg = self.get_horizontal_msg(target, right=False)
+        left_msg = self.get_horizontal_msg(target * 1.2, right=False)
         self.arm_status_pub.publish(left_msg)
         rospy.sleep(sleep_time)
 
-        up_msg = self.get_vertical_msg(target, up=True)
+        up_msg = self.get_vertical_msg((target * VERTICAL_NUM_MULTIPLIER) / 2, up=True)
         self.arm_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        right_msg = self.get_horizontal_msg(target, right=True)
+        right_msg = self.get_horizontal_msg(target * 1.15, right=True)
         self.arm_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * 1.2, up=False)
+        down_msg = self.get_vertical_msg(
+            (target * VERTICAL_NUM_MULTIPLIER) / 2 * 1.2, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
@@ -547,24 +569,26 @@ class ArmNode(object):
         rospy.sleep(sleep_time)
 
     def draw_nine(self, sleep_time, target):
+        down_msg = self.get_vertical_msg(target - 0.01, up=False)
+        self.arm_status_pub.publish(down_msg)
+        rospy.sleep(sleep_time)
+
         right_msg = self.get_horizontal_msg(target, right=True)
         self.arm_status_pub.publish(right_msg)
         rospy.sleep(sleep_time)
 
-        down_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=False)
+        down_msg = self.get_vertical_msg(
+            (target * VERTICAL_NUM_MULTIPLIER) / 2, up=False
+        )
         self.arm_status_pub.publish(down_msg)
         rospy.sleep(sleep_time)
 
-        up_msg = self.get_vertical_msg(target, up=True)
+        up_msg = self.get_vertical_msg(target * VERTICAL_NUM_MULTIPLIER, up=True)
         self.arm_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
-        left_msg = self.get_horizontal_msg(target, right=False)
+        left_msg = self.get_horizontal_msg(target * 1.15, right=False)
         self.arm_status_pub.publish(left_msg)
-        rospy.sleep(sleep_time)
-
-        up_msg = self.get_vertical_msg(target, up=True)
-        self.arm_status_pub.publish(up_msg)
         rospy.sleep(sleep_time)
 
         self.arm_status_pub.publish(self.change_dist(PULLOFF_DIST))
@@ -577,7 +601,7 @@ class ArmNode(object):
         # Get the angle for joint 0
         origin_dist_to_wall = self.box + self.l2 + self.l3
         theta0 = np.arctan2(horizontal_dist, origin_dist_to_wall)
-        
+
         # Computes the distance to the wall. We add a small factor to ensure
         # the pen keeps pressure on the board for better drawing.
         dist_to_wall = np.sqrt(horizontal_dist**2 + origin_dist_to_wall**2) + (
@@ -596,9 +620,11 @@ class ArmNode(object):
         # Move the arm to the start location and pull the pen off the board
         theta0, dist_to_wall = self.get_horizontal_parameters(digit.horizontal)
 
+        # Move answer down 3cm from below digit vertical distance
+        answer_offset_vertical = -0.03
         start_msg = self.set_arm_position_vertical(
             target_x=dist_to_wall - PULLOFF_DIST,
-            target_y=self.arm_height + digit.vertical,
+            target_y=self.arm_height + digit.vertical + answer_offset_vertical,
         )
         start_msg.direction0 = theta0
 
@@ -624,7 +650,7 @@ class ArmNode(object):
 
         # Set the size of the digit to draw based on whether we are drawing a `carry` or a regular digit
         if is_carry:
-            num_size = inches_to_meters(NUMBER_SIZE * 0.75)
+            num_size = inches_to_meters(NUMBER_SIZE * 0.5)
         else:
             num_size = inches_to_meters(NUMBER_SIZE)
 

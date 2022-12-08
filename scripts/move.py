@@ -29,7 +29,7 @@ class Robot(object):
         rospy.sleep(0.5)
 
         # Reset arm position
-        self.move_group_arm.go([0, 0, 0, 0], wait=True)
+        # self.move_group_arm.go([0, -0.05, 0, 0], wait=True)
         print("ready")
 
     def arm_dir_received(self, data: Arm):
@@ -38,14 +38,14 @@ class Robot(object):
         arm_joint_1_goal = data.direction1
         arm_joint_2_goal = data.direction2
         arm_joint_3_goal = data.direction3
-        print(
-            f"0: {np.degrees(arm_joint_0_goal)}, 1: {np.degrees(arm_joint_1_goal)}, 2: {np.degrees(arm_joint_2_goal)}, 3: {np.degrees(arm_joint_3_goal)}"
-        )
+        # print(
+        #     f"0: {np.degrees(arm_joint_0_goal)}, 1: {np.degrees(arm_joint_1_goal)}, 2: {np.degrees(arm_joint_2_goal)}, 3: {np.degrees(arm_joint_3_goal)}"
+        # )
 
         gripper_joint_open = [0, 0]
 
-        print("moving")
-        print(arm_joint_1_goal)
+        # print("moving")
+        # print(arm_joint_1_goal)
         # wait=True ensures that the movement is synchronous
         self.move_group_arm.go(
             [arm_joint_0_goal, arm_joint_1_goal, arm_joint_2_goal, arm_joint_3_goal],
