@@ -32,7 +32,7 @@ Note: The following is required for the program to run properly
 - Digits should be spaced apart for proper segmentation
 - The front of the robot should be facing directly to the board at a distance of 21cm.
 
-# Process
+### Process
 1. Terminal 1: ```roscore```
 2. Terminal 2: ```ssh``` into robot and run ```bringup```
 3. Terminal 3: ```ssh``` into robot and run ```bringup_cam```
