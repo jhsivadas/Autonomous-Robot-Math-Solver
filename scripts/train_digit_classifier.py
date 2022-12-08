@@ -84,7 +84,7 @@ if __name__ == '__main__':
     model = make_model()
 
     val_split = 0.2
-    epochs = 1
+    epochs = 10
 
     model.fit(X_train, y_train, batch_size=16, epochs=epochs, shuffle=True, validation_split=val_split)
     model.save('mnist.h5')
