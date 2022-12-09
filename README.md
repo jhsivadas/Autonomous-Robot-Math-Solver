@@ -18,6 +18,7 @@ This project requires a few main parts:
 4. The Turtlebot then uses the digit pixel locations to determine where to draw the answer digits. We implement this component using an inverse kinematics algorithm which moves the robot's arm to the desired position on the whiteboard.
 
 5. The robot then uses another inverse kinematics algorithm to draw each digit. We implement the ability to draw horizontal and vertical straight lines, and we construct each digit using combinations of horizontal and vertical movements.
+
 ![Kinematics](calculations/kinematics-diagram.png)
 
 
